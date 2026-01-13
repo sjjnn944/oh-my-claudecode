@@ -274,7 +274,7 @@ Skills are automatically activated via slash commands or magic keywords.
 
 ## Intelligent Skill Activation
 
-> **New in v1.8.0**: Skills are no longer mutually exclusive. Claude automatically combines skills based on task requirements.
+> **New in v1.11.0**: Enhanced Hook Enforcement System - PreToolUse/PostToolUse hooks and strengthened Stop hook for stronger Sisyphus behavior beyond CLAUDE.md.
 
 ### Skill Layers
 

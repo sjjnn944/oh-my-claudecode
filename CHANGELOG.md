@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-01-13
+
+### Added
+- **Enhanced Hook Enforcement System** - Stronger Sisyphus behavior enforcement beyond CLAUDE.md
+  - `pre-tool-enforcer.sh`: PreToolUse hook that injects contextual Sisyphus reminders before every tool execution
+  - `post-tool-verifier.sh`: PostToolUse hook for verification after tools, with failure detection
+  - Enhanced `persistent-mode.sh`: Stop hook now includes build/test/git/background task verification
+  - `claude-sisyphus.sh`: CLI wrapper that uses `--append-system-prompt` for direct system prompt injection
+  - `sisyphus-aliases.sh`: Shell aliases (`claude-s`, `claudew`) for easy activation
+
+### Changed
+- **Stop Hook** now enforces additional verification requirements:
+  - Build verification (if build scripts exist)
+  - Test verification (if tests exist)
+  - Git status check (warns on uncommitted changes)
+  - Background task completion check
+  - All previous checks (Ralph Loop, Ultrawork, Todo completion)
+
+- **Hook Configuration** - Added PreToolUse and PostToolUse to `hooks.json`
+
+### Technical Details
+- PreToolUse hook provides tool-specific reminders (Bash, Task, Edit, Write, Read, Grep/Glob)
+- PostToolUse hook tracks session statistics in `~/.claude/.session-stats.json`
+- Stop hook returns `continue: false` until ALL verification requirements are met
+- CLI wrapper appends core Sisyphus rules directly to Claude's system prompt
+
+### Enforcement Hierarchy
+1. **Stop Hook** with `continue: false` - Blocks ALL stopping until verified
+2. **PreToolUse** - Injects reminders BEFORE every tool
+3. **PostToolUse** - Verifies AFTER every tool
+4. **CLI Wrapper** - Appends rules to system prompt
+
 ## [1.10.0] - 2026-01-11
 
 ### Added
@@ -91,6 +123,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+[1.11.0]: https://github.com/Yeachan-Heo/oh-my-claude-sisyphus/compare/v1.10.0...v1.11.0
 [1.10.0]: https://github.com/Yeachan-Heo/oh-my-claude-sisyphus/compare/v1.9.0...v1.10.0
 [1.9.0]: https://github.com/Yeachan-Heo/oh-my-claude-sisyphus/compare/v1.8.0...v1.9.0
 [1.8.0]: https://github.com/Yeachan-Heo/oh-my-claude-sisyphus/compare/v1.7.0...v1.8.0
