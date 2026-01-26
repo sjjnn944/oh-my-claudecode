@@ -5,6 +5,75 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [3.6.0] - 2026-01-26
+
+### Added
+
+#### SQLite-based Swarm Coordination (Major Feature)
+Production-ready multi-agent task coordination with atomic claiming and transaction isolation.
+
+- **SQLite Database Backend** (`src/hooks/swarm/`)
+  - Atomic task claiming with IMMEDIATE transaction mode
+  - Lease-based ownership with 5-minute timeout
+  - Heartbeat monitoring for agent health
+  - Stale claim cleanup with automatic release
+  - WAL mode for concurrent read access
+
+- **Mode Registry** (`src/hooks/mode-registry/`)
+  - Centralized mode state detection via file-based approach
+  - Mutual exclusion between exclusive modes (autopilot, ultrapilot, swarm, pipeline)
+  - Stale marker detection with 1-hour auto-removal
+  - Marker file management for SQLite-based modes
+
+- **Worker Preamble Protocol** (`src/agents/preamble.ts`)
+  - Prevents worker agents from spawning their own sub-agents
+  - Ensures agents use tools directly (Read, Write, Edit, Bash)
+  - Requires agents to report results with absolute file paths
+  - Documented in AGENTS.md
+
+- **Ultrapilot Decomposer** (`src/hooks/ultrapilot/decomposer.ts`)
+  - AI-powered task decomposition for parallel execution
+  - File ownership assignment with non-overlapping patterns
+  - Dependency tracking and execution order calculation
+
+- **37 new tests** across 3 test files for swarm coordination
+
+### Changed
+
+#### State File Standardization
+All execution mode state files consolidated into `.omc/state/` subdirectory:
+- `autopilot-state.json`
+- `ralph-state.json`
+- `ultrawork-state.json`
+- `ultraqa-state.json`
+- `ultrapilot-state.json`
+- `swarm.db` (SQLite database)
+- `pipeline-state.json`
+- `ecomode-state.json`
+
+#### Skill Files Updated
+All skill files now include explicit "STATE CLEANUP ON COMPLETION" sections instructing to delete state files rather than just setting `active: false`.
+
+### Fixed
+
+- **Path consistency**: Fixed path mismatches between mode-registry and cancel skill
+- **Transaction isolation**: All 6 swarm transactions use `.immediate()` for proper write locking
+- **Init error handling**: `cleanupOnFailure()` prevents leftover state on initialization errors
+
+### Technical Details
+
+**New Files:**
+- `src/hooks/swarm/index.ts` - Main swarm coordination module
+- `src/hooks/swarm/state.ts` - SQLite state management
+- `src/hooks/swarm/claiming.ts` - Atomic task claiming
+- `src/hooks/swarm/types.ts` - TypeScript interfaces
+- `src/hooks/mode-registry/types.ts` - Mode registry types
+- `src/agents/preamble.ts` - Worker preamble protocol
+- `src/hooks/ultrapilot/decomposer.ts` - Task decomposition
+
+**Dependencies Added:**
+- `better-sqlite3` - SQLite3 binding for Node.js
+
 ## [3.5.7] - 2026-01-25
 
 ### Added

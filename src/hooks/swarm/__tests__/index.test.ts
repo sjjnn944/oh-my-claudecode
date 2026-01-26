@@ -72,9 +72,9 @@ describe('Swarm Lifecycle', () => {
 
     it('should fail when another exclusive mode is active', async () => {
       // Create autopilot state file to simulate active autopilot
-      const omcDir = join(testDir, '.omc');
-      mkdirSync(omcDir, { recursive: true });
-      const autopilotStatePath = join(omcDir, 'autopilot-state.json');
+      const stateDir = join(testDir, '.omc', 'state');
+      mkdirSync(stateDir, { recursive: true });
+      const autopilotStatePath = join(stateDir, 'autopilot-state.json');
       writeFileSync(autopilotStatePath, JSON.stringify({
         active: true,
         phase: 'execution',

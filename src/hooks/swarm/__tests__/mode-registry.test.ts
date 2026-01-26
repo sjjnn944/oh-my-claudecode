@@ -32,9 +32,9 @@ describe('Mode Registry Integration', () => {
 
     it('should block when exclusive mode is active', () => {
       // Create autopilot state to simulate active mode
-      const omcDir = join(testDir, '.omc');
-      mkdirSync(omcDir, { recursive: true });
-      const autopilotStatePath = join(omcDir, 'autopilot-state.json');
+      const stateDir = join(testDir, '.omc', 'state');
+      mkdirSync(stateDir, { recursive: true });
+      const autopilotStatePath = join(stateDir, 'autopilot-state.json');
       writeFileSync(autopilotStatePath, JSON.stringify({
         active: true,
         phase: 'execution',
@@ -153,9 +153,9 @@ describe('Mode Registry Integration', () => {
     });
 
     it('should detect active JSON-based mode', () => {
-      const omcDir = join(testDir, '.omc');
-      mkdirSync(omcDir, { recursive: true });
-      writeFileSync(join(omcDir, 'autopilot-state.json'), JSON.stringify({
+      const stateDir = join(testDir, '.omc', 'state');
+      mkdirSync(stateDir, { recursive: true });
+      writeFileSync(join(stateDir, 'autopilot-state.json'), JSON.stringify({
         active: true,
         phase: 'execution',
         originalIdea: 'test',
@@ -171,9 +171,9 @@ describe('Mode Registry Integration', () => {
     });
 
     it('should return false when JSON mode is inactive', () => {
-      const omcDir = join(testDir, '.omc');
-      mkdirSync(omcDir, { recursive: true });
-      writeFileSync(join(omcDir, 'autopilot-state.json'), JSON.stringify({
+      const stateDir = join(testDir, '.omc', 'state');
+      mkdirSync(stateDir, { recursive: true });
+      writeFileSync(join(stateDir, 'autopilot-state.json'), JSON.stringify({
         active: false,
         phase: 'complete',
         originalIdea: 'test',
