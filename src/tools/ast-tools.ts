@@ -10,10 +10,16 @@
 import { z } from "zod";
 import { readFileSync, readdirSync, statSync, writeFileSync } from "fs";
 import { join, extname, resolve } from "path";
+import { createRequire } from "module";
 
-// Dynamic import for @ast-grep/napi (ESM module)
+// Dynamic import for @ast-grep/napi
 // Graceful degradation: if the module is not available (e.g., in bundled/plugin context),
 // tools will return a helpful error message instead of crashing
+//
+// IMPORTANT: Uses createRequire() (CJS resolution) instead of dynamic import() (ESM resolution)
+// because ESM resolution does NOT respect NODE_PATH or Module._initPaths().
+// In the MCP server plugin context, @ast-grep/napi is installed globally and resolved
+// via NODE_PATH set in the bundle's startup banner.
 let sgModule: typeof import("@ast-grep/napi") | null = null;
 let sgLoadFailed = false;
 let sgLoadError = '';
@@ -24,11 +30,18 @@ async function getSgModule(): Promise<typeof import("@ast-grep/napi") | null> {
   }
   if (!sgModule) {
     try {
-      sgModule = await import("@ast-grep/napi");
-    } catch (error) {
-      sgLoadFailed = true;
-      sgLoadError = error instanceof Error ? error.message : String(error);
-      return null;
+      // Use createRequire for CJS-style resolution (respects NODE_PATH)
+      const require = createRequire(import.meta.url || __filename || process.cwd() + '/');
+      sgModule = require("@ast-grep/napi") as typeof import("@ast-grep/napi");
+    } catch {
+      // Fallback to dynamic import for pure ESM environments
+      try {
+        sgModule = await import("@ast-grep/napi");
+      } catch (error) {
+        sgLoadFailed = true;
+        sgLoadError = error instanceof Error ? error.message : String(error);
+        return null;
+      }
     }
   }
   return sgModule;

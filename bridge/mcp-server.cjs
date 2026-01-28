@@ -19041,6 +19041,8 @@ var lspTools = [
 // src/tools/ast-tools.ts
 var import_fs5 = require("fs");
 var import_path6 = require("path");
+var import_module = require("module");
+var import_meta = {};
 var sgModule = null;
 var sgLoadFailed = false;
 var sgLoadError = "";
@@ -19050,11 +19052,16 @@ async function getSgModule() {
   }
   if (!sgModule) {
     try {
-      sgModule = await import("@ast-grep/napi");
-    } catch (error2) {
-      sgLoadFailed = true;
-      sgLoadError = error2 instanceof Error ? error2.message : String(error2);
-      return null;
+      const require2 = (0, import_module.createRequire)(import_meta.url || __filename || process.cwd() + "/");
+      sgModule = require2("@ast-grep/napi");
+    } catch {
+      try {
+        sgModule = await import("@ast-grep/napi");
+      } catch (error2) {
+        sgLoadFailed = true;
+        sgLoadError = error2 instanceof Error ? error2.message : String(error2);
+        return null;
+      }
     }
   }
   return sgModule;
@@ -20163,7 +20170,7 @@ var path5 = __toESM(require("path"), 1);
 var import_url = require("url");
 var import_child_process7 = require("child_process");
 var import_util7 = require("util");
-var import_meta = {};
+var import_meta2 = {};
 var execFileAsync3 = (0, import_util7.promisify)(import_child_process7.execFile);
 var BRIDGE_SPAWN_TIMEOUT_MS = 3e4;
 var DEFAULT_GRACE_PERIOD_MS = 5e3;
@@ -20174,9 +20181,9 @@ function getBridgeScriptPath() {
   }
   let moduleDir;
   try {
-    if (import_meta.url) {
-      const __filename = (0, import_url.fileURLToPath)(import_meta.url);
-      moduleDir = path5.dirname(__filename);
+    if (import_meta2.url) {
+      const __filename2 = (0, import_url.fileURLToPath)(import_meta2.url);
+      moduleDir = path5.dirname(__filename2);
     } else {
       throw new Error("import.meta.url is empty");
     }
