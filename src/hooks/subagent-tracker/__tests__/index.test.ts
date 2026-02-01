@@ -10,9 +10,18 @@ import {
   readTrackingState,
   writeTrackingState,
   clearTrackingState,
+  recordToolUsageWithTiming,
+  getAgentPerformance,
+  updateTokenUsage,
+  recordFileOwnership,
+  detectFileConflicts,
+  suggestInterventions,
+  calculateParallelEfficiency,
+  getAgentObservatory,
   type SubagentInfo,
   type SubagentTrackingState,
   type ToolUsageEntry,
+  type TokenUsage,
 } from '../index.js';
 
 describe('subagent-tracker', () => {
@@ -512,6 +521,257 @@ describe('subagent-tracker', () => {
       expect(stats.completed).toBe(0);
       expect(stats.failed).toBe(0);
       expect(stats.total).toBe(0);
+    });
+  });
+
+  describe('Tool Timing (Phase 1.1)', () => {
+    it('should record tool usage with timing data', () => {
+      // Setup: create a running agent
+      const state: SubagentTrackingState = {
+        agents: [{
+          agent_id: 'timing-test',
+          agent_type: 'oh-my-claudecode:executor',
+          started_at: new Date().toISOString(),
+          parent_mode: 'ultrawork',
+          status: 'running',
+          tool_usage: [],
+        }],
+        total_spawned: 1,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      // Record tool with timing
+      recordToolUsageWithTiming(testDir, 'timing-test', 'Read', 150, true);
+      recordToolUsageWithTiming(testDir, 'timing-test', 'Edit', 500, true);
+      recordToolUsageWithTiming(testDir, 'timing-test', 'Read', 200, true);
+
+      const updated = readTrackingState(testDir);
+      const agent = updated.agents[0];
+      expect(agent.tool_usage).toHaveLength(3);
+      expect(agent.tool_usage![0].duration_ms).toBe(150);
+      expect(agent.tool_usage![1].duration_ms).toBe(500);
+    });
+
+    it('should calculate agent performance with bottleneck detection', () => {
+      const state: SubagentTrackingState = {
+        agents: [{
+          agent_id: 'perf-test',
+          agent_type: 'oh-my-claudecode:executor',
+          started_at: new Date().toISOString(),
+          parent_mode: 'ultrawork',
+          status: 'running',
+          tool_usage: [
+            { tool_name: 'Read', timestamp: new Date().toISOString(), duration_ms: 100, success: true },
+            { tool_name: 'Read', timestamp: new Date().toISOString(), duration_ms: 200, success: true },
+            { tool_name: 'Bash', timestamp: new Date().toISOString(), duration_ms: 5000, success: true },
+            { tool_name: 'Bash', timestamp: new Date().toISOString(), duration_ms: 6000, success: true },
+          ],
+        }],
+        total_spawned: 1,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      const perf = getAgentPerformance(testDir, 'perf-test');
+      expect(perf).not.toBeNull();
+      expect(perf!.tool_timings['Read'].count).toBe(2);
+      expect(perf!.tool_timings['Read'].avg_ms).toBe(150);
+      expect(perf!.tool_timings['Bash'].avg_ms).toBe(5500);
+      expect(perf!.bottleneck).toContain('Bash');
+    });
+  });
+
+  describe('Token Usage (Phase 1.2)', () => {
+    it('should update token usage for an agent', () => {
+      const state: SubagentTrackingState = {
+        agents: [{
+          agent_id: 'token-test',
+          agent_type: 'oh-my-claudecode:executor',
+          started_at: new Date().toISOString(),
+          parent_mode: 'ultrawork',
+          status: 'running',
+        }],
+        total_spawned: 1,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      updateTokenUsage(testDir, 'token-test', { input_tokens: 1000, output_tokens: 500, cost_usd: 0.05 });
+      updateTokenUsage(testDir, 'token-test', { input_tokens: 2000, output_tokens: 1000, cost_usd: 0.10 });
+
+      const updated = readTrackingState(testDir);
+      const agent = updated.agents[0];
+      expect(agent.token_usage).toBeDefined();
+      expect(agent.token_usage!.input_tokens).toBe(3000);
+      expect(agent.token_usage!.output_tokens).toBe(1500);
+      expect(agent.token_usage!.cost_usd).toBeCloseTo(0.15);
+    });
+  });
+
+  describe('File Ownership (Phase 1.3)', () => {
+    it('should record file ownership for an agent', () => {
+      const state: SubagentTrackingState = {
+        agents: [{
+          agent_id: 'file-test',
+          agent_type: 'oh-my-claudecode:executor',
+          started_at: new Date().toISOString(),
+          parent_mode: 'ultrawork',
+          status: 'running',
+        }],
+        total_spawned: 1,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      recordFileOwnership(testDir, 'file-test', join(testDir, 'src/hooks/bridge.ts'));
+      recordFileOwnership(testDir, 'file-test', join(testDir, 'src/hooks/index.ts'));
+
+      const updated = readTrackingState(testDir);
+      const agent = updated.agents[0];
+      expect(agent.file_ownership).toHaveLength(2);
+      expect(agent.file_ownership).toContain('src/hooks/bridge.ts');
+    });
+
+    it('should detect file conflicts between agents', () => {
+      const state: SubagentTrackingState = {
+        agents: [
+          {
+            agent_id: 'agent-1',
+            agent_type: 'oh-my-claudecode:executor',
+            started_at: new Date().toISOString(),
+            parent_mode: 'ultrawork',
+            status: 'running',
+            file_ownership: ['src/hooks/bridge.ts'],
+          },
+          {
+            agent_id: 'agent-2',
+            agent_type: 'oh-my-claudecode:designer',
+            started_at: new Date().toISOString(),
+            parent_mode: 'ultrawork',
+            status: 'running',
+            file_ownership: ['src/hooks/bridge.ts', 'src/ui/index.ts'],
+          },
+        ],
+        total_spawned: 2,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      const conflicts = detectFileConflicts(testDir);
+      expect(conflicts).toHaveLength(1);
+      expect(conflicts[0].file).toBe('src/hooks/bridge.ts');
+      expect(conflicts[0].agents).toContain('executor');
+      expect(conflicts[0].agents).toContain('designer');
+    });
+  });
+
+  describe('Intervention (Phase 2)', () => {
+    it('should suggest interventions for stale agents', () => {
+      const sixMinutesAgo = new Date(Date.now() - 6 * 60 * 1000).toISOString();
+      const state: SubagentTrackingState = {
+        agents: [{
+          agent_id: 'stale-agent',
+          agent_type: 'oh-my-claudecode:executor',
+          started_at: sixMinutesAgo,
+          parent_mode: 'ultrawork',
+          status: 'running',
+        }],
+        total_spawned: 1,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      const interventions = suggestInterventions(testDir);
+      expect(interventions).toHaveLength(1);
+      expect(interventions[0].type).toBe('timeout');
+      expect(interventions[0].suggested_action).toBe('kill');
+    });
+
+    it('should suggest intervention for excessive cost', () => {
+      const state: SubagentTrackingState = {
+        agents: [{
+          agent_id: 'costly-agent',
+          agent_type: 'oh-my-claudecode:executor',
+          started_at: new Date().toISOString(),
+          parent_mode: 'ultrawork',
+          status: 'running',
+          token_usage: { input_tokens: 100000, output_tokens: 50000, cache_read_tokens: 0, cost_usd: 1.50 },
+        }],
+        total_spawned: 1,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      const interventions = suggestInterventions(testDir);
+      expect(interventions.some(i => i.type === 'excessive_cost')).toBe(true);
+    });
+
+    it('should calculate parallel efficiency correctly', () => {
+      const state: SubagentTrackingState = {
+        agents: [
+          { agent_id: '1', agent_type: 'executor', started_at: new Date().toISOString(), parent_mode: 'ultrawork', status: 'running' },
+          { agent_id: '2', agent_type: 'designer', started_at: new Date().toISOString(), parent_mode: 'ultrawork', status: 'running' },
+          { agent_id: '3', agent_type: 'architect', started_at: new Date(Date.now() - 10 * 60 * 1000).toISOString(), parent_mode: 'ultrawork', status: 'running' }, // stale
+        ],
+        total_spawned: 3,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      const efficiency = calculateParallelEfficiency(testDir);
+      expect(efficiency.total).toBe(3);
+      expect(efficiency.stale).toBe(1);
+      expect(efficiency.active).toBe(2);
+      expect(efficiency.score).toBe(67); // 2/3 = 66.67% rounded
+    });
+  });
+
+  describe('Agent Observatory', () => {
+    it('should generate observatory view with all metrics', () => {
+      const state: SubagentTrackingState = {
+        agents: [{
+          agent_id: 'obs-agent',
+          agent_type: 'oh-my-claudecode:executor',
+          started_at: new Date().toISOString(),
+          parent_mode: 'ultrawork',
+          status: 'running',
+          tool_usage: [
+            { tool_name: 'Read', timestamp: new Date().toISOString(), duration_ms: 100, success: true },
+          ],
+          token_usage: { input_tokens: 5000, output_tokens: 2000, cache_read_tokens: 0, cost_usd: 0.05 },
+          file_ownership: ['src/test.ts'],
+        }],
+        total_spawned: 1,
+        total_completed: 0,
+        total_failed: 0,
+        last_updated: new Date().toISOString(),
+      };
+      writeTrackingState(testDir, state);
+
+      const observatory = getAgentObservatory(testDir);
+      expect(observatory.header).toContain('1 active');
+      expect(observatory.summary.total_agents).toBe(1);
+      expect(observatory.summary.total_cost_usd).toBeCloseTo(0.05);
+      expect(observatory.lines.length).toBeGreaterThan(0);
+      expect(observatory.lines[0]).toContain('executor');
+      expect(observatory.lines[0]).toContain('$0.05');
     });
   });
 });
