@@ -570,6 +570,18 @@ export async function handleAskGemini(args: {
     ? GEMINI_MODEL_FALLBACKS.slice(fallbackIndex)
     : [requestedModel, ...GEMINI_MODEL_FALLBACKS];
 
+  // Record output_file mtime before execution so we can detect if CLI wrote to it
+  let outputFileMtimeBefore: number | null = null;
+  let resolvedOutputPath: string | undefined;
+  if (args.output_file) {
+    resolvedOutputPath = resolve(baseDirReal, args.output_file);
+    try {
+      outputFileMtimeBefore = statSync(resolvedOutputPath).mtimeMs;
+    } catch {
+      outputFileMtimeBefore = null; // File doesn't exist yet
+    }
+  }
+
   const errors: string[] = [];
   for (const tryModel of modelsToTry) {
     try {
@@ -577,7 +589,7 @@ export async function handleAskGemini(args: {
       const usedFallback = tryModel !== requestedModel;
       const fallbackNote = usedFallback ? `[Fallback: used ${tryModel} instead of ${requestedModel}]\n\n` : '';
 
-      // Persist response to disk
+      // Persist response to disk (audit trail)
       if (promptResult) {
         persistResponse({
           provider: 'gemini',
@@ -592,51 +604,60 @@ export async function handleAskGemini(args: {
         });
       }
 
-      // Handle output_file: if CLI didn't write it, write stdout there directly
-      if (args.output_file) {
-        const outputPath = resolve(baseDirReal, args.output_file);
+      // Handle output_file: only write if CLI didn't already write to it
+      // Gemini with --yolo can write to the output_file via shell commands.
+      // If it did, we should NOT overwrite with raw stdout.
+      if (args.output_file && resolvedOutputPath) {
+        let cliWroteFile = false;
+        try {
+          const currentMtime = statSync(resolvedOutputPath).mtimeMs;
+          cliWroteFile = outputFileMtimeBefore !== null
+            ? currentMtime > outputFileMtimeBefore
+            : true; // File was created during execution
+        } catch {
+          cliWroteFile = false; // File still doesn't exist
+        }
 
-        // Lexical check: outputPath must be within trusted root
-        const relOutput = relative(trustedRootReal, outputPath);
-        if (relOutput === '' || relOutput.startsWith('..') || isAbsolute(relOutput)) {
-          console.warn(`[gemini-core] output_file '${args.output_file}' resolves outside trusted root, skipping write.`);
+        if (cliWroteFile) {
+          // CLI already wrote the output file - don't overwrite
         } else {
-          try {
-            const outputDir = dirname(outputPath);
-
-            // Ensure parent directory exists within trusted root
-            if (!existsSync(outputDir)) {
-              const relDir = relative(trustedRootReal, outputDir);
-              if (relDir.startsWith('..') || isAbsolute(relDir)) {
-                console.warn(`[gemini-core] output_file directory is outside trusted root, skipping write.`);
-              } else {
-                mkdirSync(outputDir, { recursive: true });
-              }
-            }
-
-            // Validate parent directory with realpath (symlink-safe for existing directories)
-            let outputDirReal: string | undefined;
+          // CLI didn't write the file, write response ourselves
+          const outputPath = resolvedOutputPath;
+          const relOutput = relative(trustedRootReal, outputPath);
+          if (relOutput === '' || relOutput.startsWith('..') || isAbsolute(relOutput)) {
+            console.warn(`[gemini-core] output_file '${args.output_file}' resolves outside trusted root, skipping write.`);
+          } else {
             try {
-              outputDirReal = realpathSync(outputDir);
-            } catch {
-              // Parent still doesn't exist after mkdir - skip write
-              console.warn(`[gemini-core] Failed to resolve output directory, skipping write.`);
-            }
+              const outputDir = dirname(outputPath);
 
-            if (outputDirReal) {
-              const relDirReal = relative(trustedRootReal, outputDirReal);
-              // relDirReal === '' means output dir IS the trusted root - this is ALLOWED
-              // Only block if directory resolves OUTSIDE trusted root
-              if (relDirReal.startsWith('..') || isAbsolute(relDirReal)) {
-                console.warn(`[gemini-core] output_file directory resolves outside trusted root, skipping write.`);
-              } else {
-                // ALWAYS write (Issue 3 fix: no existence check)
-                const safePath = join(outputDirReal, basename(outputPath));
-                writeFileSync(safePath, response, 'utf-8');
+              if (!existsSync(outputDir)) {
+                const relDir = relative(trustedRootReal, outputDir);
+                if (relDir.startsWith('..') || isAbsolute(relDir)) {
+                  console.warn(`[gemini-core] output_file directory is outside trusted root, skipping write.`);
+                } else {
+                  mkdirSync(outputDir, { recursive: true });
+                }
               }
+
+              let outputDirReal: string | undefined;
+              try {
+                outputDirReal = realpathSync(outputDir);
+              } catch {
+                console.warn(`[gemini-core] Failed to resolve output directory, skipping write.`);
+              }
+
+              if (outputDirReal) {
+                const relDirReal = relative(trustedRootReal, outputDirReal);
+                if (relDirReal.startsWith('..') || isAbsolute(relDirReal)) {
+                  console.warn(`[gemini-core] output_file directory resolves outside trusted root, skipping write.`);
+                } else {
+                  const safePath = join(outputDirReal, basename(outputPath));
+                  writeFileSync(safePath, response, 'utf-8');
+                }
+              }
+            } catch (err) {
+              console.warn(`[gemini-core] Failed to write output file: ${(err as Error).message}`);
             }
-          } catch (err) {
-            console.warn(`[gemini-core] Failed to write output file: ${(err as Error).message}`);
           }
         }
       }

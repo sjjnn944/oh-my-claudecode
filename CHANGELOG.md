@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [4.0.1] - 2026-02-05
+
+### Fixed
+
+- **Codex/Gemini Output File Handling** - Fixed issue where MCP bridge would overwrite output files that the CLI (Codex/Gemini) had already written via shell commands. Now checks file mtime before/after execution and preserves CLI-written content.
+- **Codex JSONL Parser** - Updated `parseCodexOutput()` to handle current Codex CLI JSONL format (`item.completed` events with `item.type === "agent_message"`). Previously only matched older `message` and `output_text` event formats.
+
 ## [4.0.0] - 2026-02-05
 
 ### Breaking Changes
