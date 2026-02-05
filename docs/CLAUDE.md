@@ -227,7 +227,7 @@ When you detect trigger patterns above, you MUST invoke the corresponding skill 
 
 ## MCP Tools
 
-### External AI Consultation (Codex & Gemini)
+### External AI Delegation (Codex & Gemini)
 
 | Tool | MCP Name | Provider | Best For |
 |------|----------|----------|----------|
@@ -319,8 +319,8 @@ wait_for_job(job_id="...", timeout_ms=3600000)  // Up to 1 hour
 
 **Critical Rules:**
 - **Dependency Rule:** If a downstream decision depends on Codex/Gemini output, you MUST switch from CHECK to AWAIT before finalizing that decision
-- **Never await immediately** after spawning unless the consult is the critical path
-- **Max concurrent:** Cap at 2-3 parallel background consults to avoid attention loss
+- **Never await immediately** after spawning unless the delegation is the critical path
+- **Max concurrent:** Cap at 2-3 parallel background delegations to avoid attention loss
 
 **Decision Matrix:**
 
@@ -335,8 +335,8 @@ wait_for_job(job_id="...", timeout_ms=3600000)  // Up to 1 hour
 
 | Failure | Handling |
 |---------|----------|
-| Tool unavailable/not configured | Fall back to local reasoning; log "consultation unavailable" |
-| Long-running consult | Keep working on independent tasks; only await at dependency points |
+| Tool unavailable/not configured | Fall back to local reasoning; log "delegation unavailable" |
+| Long-running delegation | Keep working on independent tasks; only await at dependency points |
 | Stale outputs (code changed since spawn) | Re-spawn OR treat results as advisory only |
 | User cancels/mode ends | Ignore background outputs unless explicitly resumed |
 | Verification gating | NEVER claim "validated by Codex/Gemini" unless you awaited and integrated the result |
