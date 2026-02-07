@@ -26,29 +26,40 @@ RULE 5: ALWAYS consult official documentation before implementing with SDKs/fram
 | Quick status checks | Yes | - |
 | Create/update todos | Yes | - |
 | Communicate with user | Yes | - |
-| **Any code change** | NEVER | executor-low / executor / executor-high |
-| **Complex debugging** | NEVER | architect |
-| **UI/frontend work** | NEVER | designer |
-| **Documentation** | NEVER | writer |
-| **Deep analysis** | NEVER | architect / analyst |
-| **Codebase exploration** | NEVER | explore / explore-high |
-| **Research tasks** | NEVER | researcher |
-| **Data analysis** | NEVER | scientist |
-| **Strategic planning** | NEVER | planner |
+| **Any code change** | NEVER | `executor` |
+| **Complex debugging** | NEVER | `architect` |
+| **UI/frontend work** | NEVER | `designer` |
+| **Documentation** | NEVER | `writer` |
+| **Deep analysis** | NEVER | `architect` / `analyst` |
+| **Codebase exploration** | NEVER | `explore` |
+| **Research tasks** | NEVER | `researcher` |
+| **Data analysis** | NEVER | `scientist` |
+| **Strategic planning** | NEVER | `planner` |
 
 ### Documentation-First Development
 
 Before implementing with any SDK/API/framework: delegate to `researcher` agent to fetch official docs first. Use Context7 MCP tools (`resolve-library-id` → `query-docs`) for up-to-date documentation. Never guess field names or API contracts.
 
-### Smart Model Routing
+### Adaptive Model Routing
 
-**ALWAYS pass `model` parameter explicitly when delegating!**
+**Control task complexity by passing `model` parameter on every Task call.** One agent, any intelligence tier:
 
 | Complexity | Model | When |
 |------------|-------|------|
-| Simple | `haiku` | Lookups, definitions, simple fixes |
-| Standard | `sonnet` | Feature implementation, debugging |
-| Complex | `opus` | Architecture decisions, complex refactoring |
+| Simple | `haiku` | Lookups, definitions, simple fixes, quick scans |
+| Standard | `sonnet` | Feature implementation, debugging, standard review |
+| Complex | `opus` | Architecture decisions, complex refactoring, deep analysis |
+
+```
+// Simple question → haiku (cheap, fast)
+Task(subagent_type="oh-my-claudecode:architect", model="haiku", prompt="What does this function return?")
+
+// Standard implementation → sonnet
+Task(subagent_type="oh-my-claudecode:executor", model="sonnet", prompt="Add error handling to login")
+
+// Complex refactoring → opus
+Task(subagent_type="oh-my-claudecode:executor", model="opus", prompt="Refactor auth module across 5 files")
+```
 
 ### Path-Based Write Rules
 
@@ -59,170 +70,131 @@ Delegate via: `Task(subagent_type="oh-my-claudecode:executor", model="sonnet", p
 
 ---
 
-## All 28 Agents
+## Agents (18)
 
-Always use `oh-my-claudecode:` prefix when calling via Task tool.
+Always use `oh-my-claudecode:` prefix when calling via Task tool. Use `model` parameter for complexity routing.
 
-### Agent Tier Matrix
+| Agent | Default Model | Use For |
+|-------|---------------|---------|
+| `architect` | opus | Architecture analysis, debugging, verification |
+| `executor` | sonnet | Code implementation, all code changes |
+| `deep-executor` | opus | Complex autonomous goal-oriented tasks |
+| `explore` | haiku | Codebase search, file/pattern finding |
+| `researcher` | sonnet | Documentation, external reference lookup |
+| `designer` | sonnet | UI/UX, frontend components, styling |
+| `writer` | haiku | Technical documentation, comments |
+| `vision` | sonnet | Image/screenshot/diagram analysis |
+| `planner` | opus | Strategic planning, work breakdown |
+| `critic` | opus | Plan review, critical evaluation |
+| `analyst` | opus | Pre-planning requirements analysis |
+| `scientist` | sonnet | Data analysis, statistics, research |
+| `qa-tester` | sonnet | Interactive CLI/service testing via tmux |
+| `security-reviewer` | opus | Security audits, OWASP Top 10 detection |
+| `build-fixer` | sonnet | Build/type error resolution |
+| `tdd-guide` | sonnet | Test-driven development workflows |
+| `code-reviewer` | opus | Comprehensive code quality review |
+| `git-master` | sonnet | Git operations, atomic commits, rebasing |
 
-| Domain | LOW (Haiku) | MEDIUM (Sonnet) | HIGH (Opus) |
-|--------|-------------|-----------------|-------------|
-| **Analysis** | `architect-low` | `architect-medium` | `architect` |
-| **Execution** | `executor-low` | `executor` | `executor-high` |
-| **Deep Work** | - | - | `deep-executor` |
-| **Search** | `explore` | - | `explore-high` |
-| **Research** | - | `researcher` | - |
-| **Frontend** | `designer-low` | `designer` | `designer-high` |
-| **Docs** | `writer` | - | - |
-| **Visual** | - | `vision` | - |
-| **Planning** | - | - | `planner` |
-| **Critique** | - | - | `critic` |
-| **Pre-Planning** | - | - | `analyst` |
-| **Testing** | - | `qa-tester` | - |
-| **Security** | `security-reviewer-low` | - | `security-reviewer` |
-| **Build** | - | `build-fixer` | - |
-| **TDD** | `tdd-guide-low` | `tdd-guide` | - |
-| **Code Review** | - | - | `code-reviewer` |
-| **Data Science** | - | `scientist` | `scientist-high` |
-| **Git** | - | `git-master` | - |
+### MCP-First Delegation
 
-### Agent Selection by Task
+For **read-only analysis** tasks, prefer MCP tools over spawning Claude agents — faster and cheaper:
 
-| Task | Agent | Tier |
-|------|-------|------|
-| Quick code lookup | `explore` | LOW |
-| Find files/patterns | `explore` | LOW |
-| Complex architectural search | `explore-high` | HIGH |
-| Simple code change | `executor-low` | LOW |
-| Feature implementation | `executor` | MED |
-| Complex refactoring | `executor-high` | HIGH |
-| Debug simple issue | `architect-low` | LOW |
-| Debug complex issue | `architect` | HIGH |
-| UI component | `designer` | MED |
-| Complex UI system | `designer-high` | HIGH |
-| Write docs/comments | `writer` | LOW |
-| Research docs/APIs | `researcher` | MED |
-| Analyze images/diagrams | `vision` | MED |
-| Strategic planning | `planner` | HIGH |
-| Review/critique plan | `critic` | HIGH |
-| Pre-planning analysis | `analyst` | HIGH |
-| Interactive CLI testing | `qa-tester` | MED |
-| Security review | `security-reviewer` | HIGH |
-| Quick security scan | `security-reviewer-low` | LOW |
-| Fix build errors | `build-fixer` | MED |
-| TDD workflow | `tdd-guide` | MED |
-| Quick test suggestions | `tdd-guide-low` | LOW |
-| Code review | `code-reviewer` | HIGH |
-| Data analysis/stats | `scientist` | MED |
-| Complex ML/hypothesis | `scientist-high` | HIGH |
-| Complex autonomous work | `deep-executor` | HIGH |
-| Git operations | `git-master` | MED |
+| Task Domain | MCP Tool (`agent_role`) | Agent Fallback |
+|-------------|-------------------------|----------------|
+| Architecture, debugging | `ask_codex` (architect) | `architect` |
+| Planning, strategy, critique | `ask_codex` (planner/critic) | `planner`, `critic` |
+| Pre-planning analysis | `ask_codex` (analyst) | `analyst` |
+| Code review | `ask_codex` (code-reviewer) | `code-reviewer` |
+| Security review | `ask_codex` (security-reviewer) | `security-reviewer` |
+| TDD guidance | `ask_codex` (tdd-guide) | `tdd-guide` |
+| UI/UX design | `ask_gemini` (designer) | `designer` |
+| Docs, visual analysis | `ask_gemini` (writer/vision) | `writer`, `vision` |
 
-### Tiered Architect Verification
+**Protocol:** MCP first (always attach `context_files`). If MCP unavailable, fall back to Claude agent. MCP output is advisory — verification (tests, typecheck) must come from tool-using agents.
 
-**HARD RULE: Never claim completion without verification.**
+**No MCP replacement** (need Claude's tool access): `executor`, `deep-executor`, `explore`, `researcher`, `scientist`, `build-fixer`, `qa-tester`, `git-master`.
 
-| Tier | When | Agent |
-|------|------|-------|
-| LIGHT | <5 files, <100 lines, full tests | `architect-low` (haiku) |
-| STANDARD | Default | `architect-medium` (sonnet) |
-| THOROUGH | >20 files, security/architectural | `architect` (opus) |
+**Background pattern:** SPAWN with `background: true` → CHECK with `check_job_status` → AWAIT with `wait_for_job` (up to 1 hour).
+
+### Verification
+
+**Never claim completion without verification.**
+
+| Change Size | Approach |
+|-------------|----------|
+| <5 files, <100 lines | `architect` with `model="haiku"` |
+| Standard changes | `architect` with `model="sonnet"` |
+| >20 files, security/architectural | `architect` with `model="opus"` |
 
 **Iron Law:** NO COMPLETION CLAIMS WITHOUT FRESH VERIFICATION EVIDENCE. Always: IDENTIFY what proves the claim, RUN the verification, READ the output, then CLAIM with evidence.
 
 ---
 
-## All Skills
+## Skills
 
-**Commands** (e.g., `analyze`, `git-master`) are thin routing stubs. **Skills** (e.g., `autopilot`, `ralph`) are full workflows with state management.
+Skills are user-invocable commands (`/oh-my-claudecode:<name>`). **Workflows** are stateful multi-step processes. **Agent shortcuts** are thin wrappers that invoke the corresponding agent.
 
-### Execution Modes
+### Workflows
 
 | Skill | Trigger | Description |
 |-------|---------|-------------|
 | `autopilot` | "autopilot", "build me", "I want a" | Full autonomous execution from idea to working code |
-| `ralph` | "ralph", "don't stop", "must complete" | Self-referential loop until task completion with architect verification. Includes ultrawork. |
+| `ralph` | "ralph", "don't stop", "must complete" | Self-referential loop with architect verification. Includes ultrawork. |
 | `ultrawork` | "ulw", "ultrawork" | Maximum parallelism with parallel agent orchestration |
-| `ultrapilot` | "ultrapilot", "parallel build" | Parallel autopilot with file ownership partitioning (up to 5x faster) |
-| `ecomode` | "eco", "ecomode", "efficient", "budget" | Token-efficient parallel execution using Haiku and Sonnet agents |
+| `ultrapilot` | "ultrapilot", "parallel build" | Parallel autopilot with file ownership partitioning |
+| `ecomode` | "eco", "ecomode", "budget" | Token-efficient execution using Haiku and Sonnet |
 | `team` | "team", "coordinated team" | N coordinated agents using Claude Code native teams |
-| `pipeline` | "pipeline", "chain agents" | Sequential agent chaining with data passing between stages |
-| `ultraqa` | (activated by autopilot) | QA cycling workflow — test, verify, fix, repeat until goal met |
+| `pipeline` | "pipeline", "chain agents" | Sequential agent chaining with data passing |
+| `ultraqa` | (activated by autopilot) | QA cycling — test, verify, fix, repeat |
+| `plan` | "plan this", "plan the" | Strategic planning. Supports `--consensus` and `--review` modes. |
+| `research` | "research", "analyze data" | Parallel scientist agents for comprehensive research |
+| `deepinit` | "deepinit" | Deep codebase init with hierarchical AGENTS.md |
 
-### Planning
+### Agent Shortcuts
 
-| Skill | Trigger | Description |
-|-------|---------|-------------|
-| `plan` | "plan this", "plan the" | Strategic planning with optional interview workflow. Supports `--consensus` (iterative Planner/Architect/Critic loop) and `--review` (Critic review) modes. |
-| `analyze` | "analyze", "debug", "investigate" | Deep analysis and investigation |
+Thin wrappers that invoke the corresponding agent. Call the agent directly with `model` parameter for more control.
 
-### Search & Research
+| Skill | Agent | Trigger |
+|-------|-------|---------|
+| `analyze` | `architect` | "analyze", "debug", "investigate" |
+| `deepsearch` | `explore` | "search", "find in codebase" |
+| `tdd` | `tdd-guide` | "tdd", "test first", "red green" |
+| `build-fix` | `build-fixer` | "fix build", "type errors" |
+| `code-review` | `code-reviewer` | "review code" |
+| `security-review` | `security-reviewer` | "security review" |
+| `frontend-ui-ux` | `designer` | UI/component/styling work (auto) |
+| `git-master` | `git-master` | Git/commit work (auto) |
 
-| Skill | Trigger | Description |
-|-------|---------|-------------|
-| `deepsearch` | "search", "find in codebase" | Thorough codebase search |
-| `deepinit` | "deepinit" | Deep codebase initialization with hierarchical AGENTS.md documentation |
-| `research` | "research", "analyze data", "statistics" | Orchestrate parallel scientist agents for comprehensive research |
+### MCP Delegation (auto-detected)
 
-### Quality & Review
+| Pattern | MCP Tool |
+|---------|----------|
+| `ask codex`, `use codex`, `delegate to codex` | `ask_codex` |
+| `ask gpt`, `use gpt`, `delegate to gpt` | `ask_codex` |
+| `ask gemini`, `use gemini`, `delegate to gemini` | `ask_gemini` |
 
-| Skill | Trigger | Description |
-|-------|---------|-------------|
-| `tdd` | "tdd", "test first", "red green" | Test-Driven Development enforcement — write tests first |
-| `build-fix` | "fix build", "type errors" | Fix build and TypeScript errors with minimal changes |
-| `code-review` | "review code" | Comprehensive code quality review |
-| `security-review` | "security review" | Security vulnerability detection (OWASP Top 10) |
+Intent phrase required (`ask`, `use`, `delegate to`). Bare keywords don't trigger.
 
-### Silent Activators (auto-detected)
-
-| Skill | Trigger | Description |
-|-------|---------|-------------|
-| `frontend-ui-ux` | UI/component/styling work | Designer-developer for stunning UI/UX |
-| `git-master` | Git/commit work | Git expert for atomic commits, rebasing, history management |
-
-### MCP Delegation Keywords (auto-detected)
-
-| Keyword Pattern | Maps To | MCP Tool |
-|----------------|---------|----------|
-| `ask codex`, `use codex`, `delegate to codex` | Codex | `ask_codex` |
-| `ask gpt`, `use gpt`, `delegate to gpt` | Codex | `ask_codex` |
-| `ask gemini`, `use gemini`, `delegate to gemini` | Gemini | `ask_gemini` |
-
-These trigger MCP delegation instead of skill invocation. Bare keywords alone do NOT trigger -- an intent phrase (`ask`, `use`, `delegate to`) is required.
-
-### Utilities
+### Utilities & Setup
 
 | Skill | Trigger | Description |
 |-------|---------|-------------|
-| `cancel` | "cancelomc", "stopomc" | Cancel any active OMC mode (auto-detects which) |
-| `note` | "/note" | Save notes to notepad for compaction resilience |
-| `learner` | "/learner" | Extract a learned skill from current conversation |
+| `cancel` | "cancelomc", "stopomc" | Cancel any active OMC mode |
+| `note` | "/note" | Save notes for compaction resilience |
+| `learner` | "/learner" | Extract a learned skill |
+| `omc-setup` | - | One-time setup (the ONLY command you need) |
+| `mcp-setup` | - | Configure MCP servers |
+| `hud` | - | Configure HUD display |
+| `doctor` | - | Diagnose installation issues |
+| `help` | - | Usage guide |
 
-### Setup
+### Skill Invocation Rules
 
-| Skill | Description |
-|-------|-------------|
-| `omc-setup` | One-time setup — the ONLY command you need to learn |
-| `mcp-setup` | Configure popular MCP servers |
-| `hud` | Configure HUD display options |
-| `doctor` | Diagnose and fix installation issues |
-| `help` | Guide on using oh-my-claudecode |
+When you detect trigger patterns, invoke the corresponding skill immediately.
 
-### Mandatory Skill Invocation
+**Conflict Resolution:** Explicit mode keywords (`ulw`, `ultrawork`, `eco`, `ecomode`) override defaults. If both present, ecomode wins. Generic "fast"/"parallel" reads `~/.claude/.omc-config.json` → `defaultExecutionMode`.
 
-When you detect trigger patterns above, you MUST invoke the corresponding skill immediately.
-
-**Keyword Conflict Resolution:**
-- Explicit mode keywords (`ulw`, `ultrawork`, `eco`, `ecomode`) ALWAYS override defaults
-- If BOTH present, **ecomode wins** (more token-restrictive)
-- Generic "fast"/"parallel" → read `~/.claude/.omc-config.json` → `defaultExecutionMode` (default: ultrawork)
-
-### Mode Relationships
-
-- **ralph includes ultrawork**: ralph is a persistence wrapper around ultrawork's parallelism
-- **ecomode is a modifier**: It only changes model routing, not execution behavior
-- **autopilot can transition**: To ralph (persistence) or ultraqa (QA cycling)
-- **autopilot and ultrapilot are mutually exclusive**
+**Mode Relationships:** ralph includes ultrawork (persistence wrapper). Ecomode is a modifier (model routing only). Autopilot can transition to ralph or ultraqa. Autopilot and ultrapilot are mutually exclusive.
 
 ---
 
@@ -235,24 +207,7 @@ When you detect trigger patterns above, you MUST invoke the corresponding skill 
 | Codex | `mcp__x__ask_codex` | OpenAI (gpt-5.3-codex) | Code analysis, planning validation, review |
 | Gemini | `mcp__g__ask_gemini` | Google (gemini-3-pro-preview) | Design consistency across many files (1M context) |
 
-**MCP-Direct Replacement — Call MCPs directly instead of spawning Claude agents:**
-
-| Task Domain | MCP Tool | Replaces |
-|-------------|----------|----------|
-| Architecture, debugging | `ask_codex` (architect) | `architect` / `architect-medium` / `architect-low` |
-| Planning, strategy, critique | `ask_codex` (planner/critic) | `planner`, `critic` |
-| Pre-planning analysis | `ask_codex` (analyst) | `analyst` |
-| Code review | `ask_codex` (code-reviewer) | `code-reviewer` |
-| Security review | `ask_codex` (security-reviewer) | `security-reviewer` / `security-reviewer-low` |
-| TDD guidance | `ask_codex` (tdd-guide) | `tdd-guide` / `tdd-guide-low` |
-| UI/UX design, frontend | `ask_gemini` (designer) | `designer` / `designer-low` / `designer-high` |
-| Docs, visual analysis | `ask_gemini` (writer/vision) | `writer`, `vision` |
-
-**Agents to keep using (no MCP replacement):** `executor` (all tiers), `explore`/`explore-high`, `researcher`, `scientist`, `build-fixer`, `qa-tester`, `git-master`, `deep-executor` — these need Claude's tool access, Context7, or Python REPL.
-
-**Protocol:** Call MCP tools directly for tasks in the replacement table (always attach `context_files`). If MCP unavailable, fall back to equivalent Claude agent. MCP output is advisory -- verification (tests, typecheck) must come from tool-using agents.
-
-**Background pattern:** SPAWN with `background: true` → CHECK with `check_job_status` → AWAIT with `wait_for_job` (up to 1 hour).
+Routing rules and fallback policy in [MCP-First Delegation](#mcp-first-delegation) above.
 
 ### OMC State Tools
 
@@ -278,13 +233,13 @@ LSP tools `lsp_hover`, `lsp_goto_definition`, `lsp_prepare_rename`, `lsp_rename`
 
 | Tool | Description | Agent Access |
 |------|-------------|-------------|
-| `lsp_find_references` | Find all usages of a symbol | `explore-high` only |
-| `lsp_document_symbols` | File symbol outline | `explore`, `explore-high` |
-| `lsp_workspace_symbols` | Search symbols by name | `explore`, `explore-high` |
+| `lsp_find_references` | Find all usages of a symbol | `explore` (opus) |
+| `lsp_document_symbols` | File symbol outline | `explore` |
+| `lsp_workspace_symbols` | Search symbols by name | `explore` |
 | `lsp_diagnostics` | File errors/warnings | Most agents |
 | `lsp_diagnostics_directory` | Project-wide type checking (tsc --noEmit) | `architect`, `executor`, `build-fixer` |
 | `ast_grep_search` | Structural code pattern search | `explore`, `architect`, `code-reviewer` |
-| `ast_grep_replace` | Structural code transformation | `executor-high`, `deep-executor` only |
+| `ast_grep_replace` | Structural code transformation | `executor` (opus), `deep-executor` |
 | `python_repl` | Persistent Python REPL for data analysis | `scientist` |
 
 ---

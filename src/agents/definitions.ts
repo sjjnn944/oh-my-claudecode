@@ -54,6 +54,7 @@ export { loadAgentPrompt };
 
 /**
  * Architect-Medium Agent - Standard Analysis (Sonnet)
+ * @deprecated Use architect agent with model="sonnet" instead
  */
 export const architectMediumAgent: AgentConfig = {
   name: 'architect-medium',
@@ -65,6 +66,7 @@ export const architectMediumAgent: AgentConfig = {
 
 /**
  * Architect-Low Agent - Quick Analysis (Haiku)
+ * @deprecated Use architect agent with model="haiku" instead
  */
 export const architectLowAgent: AgentConfig = {
   name: 'architect-low',
@@ -76,6 +78,7 @@ export const architectLowAgent: AgentConfig = {
 
 /**
  * Executor-High Agent - Complex Execution (Opus)
+ * @deprecated Use executor agent with model="opus" instead
  */
 export const executorHighAgent: AgentConfig = {
   name: 'executor-high',
@@ -87,6 +90,7 @@ export const executorHighAgent: AgentConfig = {
 
 /**
  * Executor-Low Agent - Simple Execution (Haiku)
+ * @deprecated Use executor agent with model="haiku" instead
  */
 export const executorLowAgent: AgentConfig = {
   name: 'executor-low',
@@ -99,6 +103,7 @@ export const executorLowAgent: AgentConfig = {
 
 /**
  * Explore-High Agent - Complex Architectural Search (Opus)
+ * @deprecated Use explore agent with model="opus" instead
  */
 export const exploreHighAgent: AgentConfig = {
   name: 'explore-high',
@@ -110,6 +115,7 @@ export const exploreHighAgent: AgentConfig = {
 
 /**
  * Designer-Low Agent - Simple UI Tasks (Haiku)
+ * @deprecated Use designer agent with model="haiku" instead
  */
 export const designerLowAgent: AgentConfig = {
   name: 'designer-low',
@@ -121,6 +127,7 @@ export const designerLowAgent: AgentConfig = {
 
 /**
  * Designer-High Agent - Complex UI Architecture (Opus)
+ * @deprecated Use designer agent with model="opus" instead
  */
 export const designerHighAgent: AgentConfig = {
   name: 'designer-high',
@@ -133,6 +140,7 @@ export const designerHighAgent: AgentConfig = {
 
 /**
  * Scientist-High Agent - Complex Research (Opus)
+ * @deprecated Use scientist agent with model="opus" instead
  */
 export const scientistHighAgent: AgentConfig = {
   name: 'scientist-high',
@@ -159,6 +167,7 @@ export const securityReviewerAgent: AgentConfig = {
 
 /**
  * Security-Reviewer-Low Agent - Quick Security Scan (Haiku)
+ * @deprecated Use security-reviewer agent with model="haiku" instead
  */
 export const securityReviewerLowAgent: AgentConfig = {
   name: 'security-reviewer-low',
@@ -193,6 +202,7 @@ export const tddGuideAgent: AgentConfig = {
 
 /**
  * TDD-Guide-Low Agent - Quick Test Suggestions (Haiku)
+ * @deprecated Use tdd-guide agent with model="haiku" instead
  */
 export const tddGuideLowAgent: AgentConfig = {
   name: 'tdd-guide-low',
