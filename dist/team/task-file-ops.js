@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { sanitizeName } from './tmux-session.js';
 /** Atomic write: write to temp file, then rename (prevents corruption on crash) */
 function atomicWriteJson(filePath, data) {
     const dir = dirname(filePath);
@@ -26,7 +27,7 @@ function sanitizeTaskId(taskId) {
 }
 /** Paths helper */
 function tasksDir(teamName) {
-    return join(homedir(), '.claude', 'tasks', teamName);
+    return join(homedir(), '.claude', 'tasks', sanitizeName(teamName));
 }
 function taskPath(teamName, taskId) {
     return join(tasksDir(teamName), `${sanitizeTaskId(taskId)}.json`);

@@ -25,6 +25,29 @@ var import_path5 = require("path");
 var import_fs = require("fs");
 var import_path = require("path");
 var import_os = require("os");
+
+// src/team/tmux-session.ts
+var import_child_process = require("child_process");
+var TMUX_SESSION_PREFIX = "omc-team";
+function sanitizeName(name) {
+  const sanitized = name.replace(/[^a-zA-Z0-9-]/g, "");
+  if (sanitized.length === 0) {
+    throw new Error(`Invalid name: "${name}" contains no valid characters (alphanumeric or hyphen)`);
+  }
+  return sanitized.slice(0, 50);
+}
+function sessionName(teamName, workerName) {
+  return `${TMUX_SESSION_PREFIX}-${sanitizeName(teamName)}-${sanitizeName(workerName)}`;
+}
+function killSession(teamName, workerName) {
+  const name = sessionName(teamName, workerName);
+  try {
+    (0, import_child_process.execFileSync)("tmux", ["kill-session", "-t", name], { stdio: "pipe", timeout: 5e3 });
+  } catch {
+  }
+}
+
+// src/team/task-file-ops.ts
 function atomicWriteJson(filePath, data) {
   const dir = (0, import_path.dirname)(filePath);
   if (!(0, import_fs.existsSync)(dir)) (0, import_fs.mkdirSync)(dir, { recursive: true });
@@ -39,7 +62,7 @@ function sanitizeTaskId(taskId) {
   return taskId;
 }
 function tasksDir(teamName) {
-  return (0, import_path.join)((0, import_os.homedir)(), ".claude", "tasks", teamName);
+  return (0, import_path.join)((0, import_os.homedir)(), ".claude", "tasks", sanitizeName(teamName));
 }
 function taskPath(teamName, taskId) {
   return (0, import_path.join)(tasksDir(teamName), `${sanitizeTaskId(taskId)}.json`);
@@ -140,19 +163,19 @@ var import_fs2 = require("fs");
 var import_path2 = require("path");
 var import_os2 = require("os");
 function teamsDir(teamName) {
-  return (0, import_path2.join)((0, import_os2.homedir)(), ".claude", "teams", teamName);
+  return (0, import_path2.join)((0, import_os2.homedir)(), ".claude", "teams", sanitizeName(teamName));
 }
 function inboxPath(teamName, workerName) {
-  return (0, import_path2.join)(teamsDir(teamName), "inbox", `${workerName}.jsonl`);
+  return (0, import_path2.join)(teamsDir(teamName), "inbox", `${sanitizeName(workerName)}.jsonl`);
 }
 function inboxCursorPath(teamName, workerName) {
-  return (0, import_path2.join)(teamsDir(teamName), "inbox", `${workerName}.offset`);
+  return (0, import_path2.join)(teamsDir(teamName), "inbox", `${sanitizeName(workerName)}.offset`);
 }
 function outboxPath(teamName, workerName) {
-  return (0, import_path2.join)(teamsDir(teamName), "outbox", `${workerName}.jsonl`);
+  return (0, import_path2.join)(teamsDir(teamName), "outbox", `${sanitizeName(workerName)}.jsonl`);
 }
 function signalPath(teamName, workerName) {
-  return (0, import_path2.join)(teamsDir(teamName), "signals", `${workerName}.shutdown`);
+  return (0, import_path2.join)(teamsDir(teamName), "signals", `${sanitizeName(workerName)}.shutdown`);
 }
 function ensureDir(filePath) {
   const dir = (0, import_path2.dirname)(filePath);
@@ -197,8 +220,11 @@ function readNewInboxMessages(teamName, workerName) {
   if (stat.size <= offset) return [];
   const fd = (0, import_fs2.openSync)(inbox, "r");
   const buffer = Buffer.alloc(stat.size - offset);
-  (0, import_fs2.readSync)(fd, buffer, 0, buffer.length, offset);
-  (0, import_fs2.closeSync)(fd);
+  try {
+    (0, import_fs2.readSync)(fd, buffer, 0, buffer.length, offset);
+  } finally {
+    (0, import_fs2.closeSync)(fd);
+  }
   const newData = buffer.toString("utf-8");
   const messages = [];
   let lastNewlineOffset = 0;
@@ -252,7 +278,7 @@ function atomicWriteJson2(filePath, data) {
   (0, import_fs3.renameSync)(tmpPath, filePath);
 }
 function configPath(teamName) {
-  return (0, import_path3.join)((0, import_os3.homedir)(), ".claude", "teams", teamName, "config.json");
+  return (0, import_path3.join)((0, import_os3.homedir)(), ".claude", "teams", sanitizeName(teamName), "config.json");
 }
 function shadowRegistryPath(workingDirectory) {
   return (0, import_path3.join)(workingDirectory, ".omc", "state", "team-mcp-workers.json");
@@ -291,7 +317,7 @@ function atomicWriteJson3(filePath, data) {
   (0, import_fs4.renameSync)(tmpPath, filePath);
 }
 function heartbeatPath(workingDirectory, teamName, workerName) {
-  return (0, import_path4.join)(workingDirectory, ".omc", "state", "team-bridge", teamName, `${workerName}.heartbeat.json`);
+  return (0, import_path4.join)(workingDirectory, ".omc", "state", "team-bridge", sanitizeName(teamName), `${sanitizeName(workerName)}.heartbeat.json`);
 }
 function writeHeartbeat(workingDirectory, data) {
   const filePath = heartbeatPath(workingDirectory, data.teamName, data.workerName);
@@ -307,27 +333,6 @@ function deleteHeartbeat(workingDirectory, teamName, workerName) {
   }
 }
 
-// src/team/tmux-session.ts
-var import_child_process = require("child_process");
-var TMUX_SESSION_PREFIX = "omc-team";
-function sanitizeName(name) {
-  const sanitized = name.replace(/[^a-zA-Z0-9-]/g, "");
-  if (sanitized.length === 0) {
-    throw new Error(`Invalid name: "${name}" contains no valid characters (alphanumeric or hyphen)`);
-  }
-  return sanitized.slice(0, 50);
-}
-function sessionName(teamName, workerName) {
-  return `${TMUX_SESSION_PREFIX}-${sanitizeName(teamName)}-${sanitizeName(workerName)}`;
-}
-function killSession(teamName, workerName) {
-  const name = sessionName(teamName, workerName);
-  try {
-    (0, import_child_process.execFileSync)("tmux", ["kill-session", "-t", name], { stdio: "pipe", timeout: 5e3 });
-  } catch {
-  }
-}
-
 // src/team/mcp-team-bridge.ts
 function log(message) {
   const ts = (/* @__PURE__ */ new Date()).toISOString();
@@ -336,6 +341,7 @@ function log(message) {
 function sleep(ms) {
   return new Promise((resolve2) => setTimeout(resolve2, ms));
 }
+var MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 function buildHeartbeat(config, status, currentTaskId, consecutiveErrors) {
   return {
     workerName: config.workerName,
@@ -434,7 +440,7 @@ function spawnCliProcess(provider, prompt, model, cwd, timeoutMs) {
     args = ["exec", "-m", model || "gpt-5.3-codex", "--json", "--full-auto"];
   } else {
     cmd = "gemini";
-    args = ["-p", "", "--yolo"];
+    args = ["--yolo"];
     if (model) args.push("--model", model);
   }
   const child = (0, import_child_process2.spawn)(cmd, args, {
@@ -454,10 +460,10 @@ function spawnCliProcess(provider, prompt, model, cwd, timeoutMs) {
       }
     }, timeoutMs);
     child.stdout?.on("data", (data) => {
-      stdout += data.toString();
+      if (stdout.length < MAX_BUFFER_SIZE) stdout += data.toString();
     });
     child.stderr?.on("data", (data) => {
-      stderr += data.toString();
+      if (stderr.length < MAX_BUFFER_SIZE) stderr += data.toString();
     });
     child.on("close", (code) => {
       if (!settled) {
@@ -495,12 +501,16 @@ async function handleShutdown(config, signal, activeChild) {
   const { teamName, workerName, workingDirectory } = config;
   log(`[bridge] Shutdown signal received: ${signal.reason}`);
   if (activeChild && !activeChild.killed) {
+    let closed = false;
+    activeChild.on("close", () => {
+      closed = true;
+    });
     activeChild.kill("SIGTERM");
     await Promise.race([
       new Promise((resolve2) => activeChild.on("close", () => resolve2())),
       sleep(5e3)
     ]);
-    if (!activeChild.killed) {
+    if (!closed) {
       activeChild.kill("SIGKILL");
     }
   }
@@ -656,6 +666,11 @@ function main() {
   for (const sig of ["SIGINT", "SIGTERM"]) {
     process.on(sig, () => {
       console.error(`[bridge] Received ${sig}, shutting down...`);
+      try {
+        deleteHeartbeat(config.workingDirectory, config.teamName, config.workerName);
+        unregisterMcpWorker(config.teamName, config.workerName, config.workingDirectory);
+      } catch {
+      }
       process.exit(0);
     });
   }

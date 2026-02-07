@@ -29,7 +29,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       const result = activateUltrawork(prompt, sessionId, tempDir);
       expect(result).toBe(true);
 
-      const state = readUltraworkState(tempDir);
+      const state = readUltraworkState(tempDir, sessionId);
       expect(state).not.toBeNull();
       expect(state?.session_id).toBe(sessionId);
       expect(state?.active).toBe(true);
@@ -51,16 +51,17 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       const sessionId = 'session-xyz';
       activateUltrawork('Test task', sessionId, tempDir);
 
-      const state = readUltraworkState(tempDir);
+      const state = readUltraworkState(tempDir, sessionId);
       expect(state?.reinforcement_count).toBe(0);
     });
 
     it('should set started_at and last_checked_at timestamps', () => {
       const beforeTime = Date.now();
-      activateUltrawork('Test task', 'session-1', tempDir);
+      const sessionId = 'session-1';
+      activateUltrawork('Test task', sessionId, tempDir);
       const afterTime = Date.now();
 
-      const state = readUltraworkState(tempDir);
+      const state = readUltraworkState(tempDir, sessionId);
       expect(state?.started_at).toBeDefined();
       expect(state?.last_checked_at).toBeDefined();
 
@@ -119,7 +120,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
     it('should return false when ultrawork is not active', () => {
       const sessionId = 'session-inactive';
       activateUltrawork('Test task', sessionId, tempDir);
-      deactivateUltrawork(tempDir);
+      deactivateUltrawork(tempDir, sessionId);
 
       const result = shouldReinforceUltrawork(sessionId, tempDir);
       expect(result).toBe(false);
@@ -139,7 +140,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       // Session A activates ultrawork
       activateUltrawork('Session A task', sessionA, tempDir);
 
-      let state = readUltraworkState(tempDir);
+      let state = readUltraworkState(tempDir, sessionA);
       expect(state?.active).toBe(true);
       expect(state?.session_id).toBe(sessionA);
 
@@ -161,7 +162,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       expect(shouldReinforce).toBe(true);
 
       // Increment reinforcement
-      let updatedState = incrementReinforcement(tempDir);
+      let updatedState = incrementReinforcement(tempDir, sessionA);
       expect(updatedState?.reinforcement_count).toBe(1);
 
       // Second reinforcement check
@@ -169,7 +170,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       expect(shouldReinforce).toBe(true);
 
       // Increment again
-      updatedState = incrementReinforcement(tempDir);
+      updatedState = incrementReinforcement(tempDir, sessionA);
       expect(updatedState?.reinforcement_count).toBe(2);
     });
 
@@ -186,7 +187,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       expect(shouldReinforceUltrawork(newSession, tempDir)).toBe(false);
 
       // Even after incrementing with original session
-      incrementReinforcement(tempDir);
+      incrementReinforcement(tempDir, originalSession);
 
       // New session still cannot reinforce
       expect(shouldReinforceUltrawork(newSession, tempDir)).toBe(false);
@@ -202,7 +203,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       expect(shouldReinforceUltrawork(sessionB, tempDir)).toBe(false);
 
       // Session A deactivates
-      deactivateUltrawork(tempDir);
+      deactivateUltrawork(tempDir, sessionA);
       expect(shouldReinforceUltrawork(sessionA, tempDir)).toBe(false);
 
       // Session B can now activate its own ultrawork
@@ -230,11 +231,11 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       // Multiple reinforcement cycles
       for (let i = 0; i < 5; i++) {
         expect(shouldReinforceUltrawork(sessionId, tempDir)).toBe(true);
-        incrementReinforcement(tempDir);
+        incrementReinforcement(tempDir, sessionId);
       }
 
       // Session ID should still be preserved
-      const state = readUltraworkState(tempDir);
+      const state = readUltraworkState(tempDir, sessionId);
       expect(state?.session_id).toBe(sessionId);
       expect(state?.reinforcement_count).toBe(5);
     });
@@ -255,7 +256,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
           }
         }
 
-        deactivateUltrawork(tempDir);
+        deactivateUltrawork(tempDir, session);
       }
     });
   });
@@ -265,7 +266,7 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       const sessionId = 'session-ralph-linked';
       activateUltrawork('Ralph-linked task', sessionId, tempDir, true);
 
-      const state = readUltraworkState(tempDir);
+      const state = readUltraworkState(tempDir, sessionId);
       expect(state?.session_id).toBe(sessionId);
       expect(state?.linked_to_ralph).toBe(true);
 
@@ -288,8 +289,8 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       const sessionId = 'session-consistency';
       activateUltrawork('Consistency test', sessionId, tempDir);
 
-      const state1 = readUltraworkState(tempDir);
-      const state2 = readUltraworkState(tempDir);
+      const state1 = readUltraworkState(tempDir, sessionId);
+      const state2 = readUltraworkState(tempDir, sessionId);
 
       expect(state1).toEqual(state2);
       expect(state1?.session_id).toBe(sessionId);
@@ -300,15 +301,15 @@ describe('Ultrawork Session Isolation (Issue #269)', () => {
       const sessionId = 'session-timestamp';
       activateUltrawork('Timestamp test', sessionId, tempDir);
 
-      const initialState = readUltraworkState(tempDir);
+      const initialState = readUltraworkState(tempDir, sessionId);
       const initialTimestamp = initialState?.last_checked_at;
 
       // Wait a tiny bit to ensure timestamp difference
       await new Promise(resolve => setTimeout(resolve, 10));
 
-      incrementReinforcement(tempDir);
+      incrementReinforcement(tempDir, sessionId);
 
-      const updatedState = readUltraworkState(tempDir);
+      const updatedState = readUltraworkState(tempDir, sessionId);
       expect(updatedState?.session_id).toBe(sessionId);
       // Timestamps are ISO strings, compare as dates
       expect(new Date(updatedState?.last_checked_at || 0).getTime())

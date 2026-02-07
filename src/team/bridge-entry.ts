@@ -9,6 +9,8 @@ import { readFileSync } from 'fs';
 import { resolve } from 'path';
 import type { BridgeConfig } from './types.js';
 import { runBridge } from './mcp-team-bridge.js';
+import { deleteHeartbeat } from './heartbeat.js';
+import { unregisterMcpWorker } from './team-registration.js';
 
 function main(): void {
   // Parse --config flag
@@ -54,7 +56,10 @@ function main(): void {
   for (const sig of ['SIGINT', 'SIGTERM'] as const) {
     process.on(sig, () => {
       console.error(`[bridge] Received ${sig}, shutting down...`);
-      // Heartbeat will go stale and lead will detect dead worker
+      try {
+        deleteHeartbeat(config.workingDirectory, config.teamName, config.workerName);
+        unregisterMcpWorker(config.teamName, config.workerName, config.workingDirectory);
+      } catch { /* best-effort cleanup */ }
       process.exit(0);
     });
   }

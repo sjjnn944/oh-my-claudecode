@@ -8,21 +8,22 @@
 import { appendFileSync, readFileSync, writeFileSync, existsSync, mkdirSync, statSync, unlinkSync, renameSync, openSync, readSync, closeSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { sanitizeName } from './tmux-session.js';
 // --- Path helpers ---
 function teamsDir(teamName) {
-    return join(homedir(), '.claude', 'teams', teamName);
+    return join(homedir(), '.claude', 'teams', sanitizeName(teamName));
 }
 function inboxPath(teamName, workerName) {
-    return join(teamsDir(teamName), 'inbox', `${workerName}.jsonl`);
+    return join(teamsDir(teamName), 'inbox', `${sanitizeName(workerName)}.jsonl`);
 }
 function inboxCursorPath(teamName, workerName) {
-    return join(teamsDir(teamName), 'inbox', `${workerName}.offset`);
+    return join(teamsDir(teamName), 'inbox', `${sanitizeName(workerName)}.offset`);
 }
 function outboxPath(teamName, workerName) {
-    return join(teamsDir(teamName), 'outbox', `${workerName}.jsonl`);
+    return join(teamsDir(teamName), 'outbox', `${sanitizeName(workerName)}.jsonl`);
 }
 function signalPath(teamName, workerName) {
-    return join(teamsDir(teamName), 'signals', `${workerName}.shutdown`);
+    return join(teamsDir(teamName), 'signals', `${sanitizeName(workerName)}.shutdown`);
 }
 /** Ensure directory exists for a file path */
 function ensureDir(filePath) {
@@ -103,8 +104,12 @@ export function readNewInboxMessages(teamName, workerName) {
     // Read from offset
     const fd = openSync(inbox, 'r');
     const buffer = Buffer.alloc(stat.size - offset);
-    readSync(fd, buffer, 0, buffer.length, offset);
-    closeSync(fd);
+    try {
+        readSync(fd, buffer, 0, buffer.length, offset);
+    }
+    finally {
+        closeSync(fd);
+    }
     const newData = buffer.toString('utf-8');
     const messages = [];
     let lastNewlineOffset = 0; // Track bytes consumed through last complete line

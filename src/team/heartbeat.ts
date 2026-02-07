@@ -11,6 +11,7 @@
 import { writeFileSync, readFileSync, existsSync, mkdirSync, readdirSync, unlinkSync, renameSync, rmdirSync } from 'fs';
 import { join, dirname } from 'path';
 import type { HeartbeatData } from './types.js';
+import { sanitizeName } from './tmux-session.js';
 
 /** Atomic write helper */
 function atomicWriteJson(filePath: string, data: unknown): void {
@@ -23,12 +24,12 @@ function atomicWriteJson(filePath: string, data: unknown): void {
 
 /** Heartbeat file path */
 function heartbeatPath(workingDirectory: string, teamName: string, workerName: string): string {
-  return join(workingDirectory, '.omc', 'state', 'team-bridge', teamName, `${workerName}.heartbeat.json`);
+  return join(workingDirectory, '.omc', 'state', 'team-bridge', sanitizeName(teamName), `${sanitizeName(workerName)}.heartbeat.json`);
 }
 
 /** Heartbeat directory for a team */
 function heartbeatDir(workingDirectory: string, teamName: string): string {
-  return join(workingDirectory, '.omc', 'state', 'team-bridge', teamName);
+  return join(workingDirectory, '.omc', 'state', 'team-bridge', sanitizeName(teamName));
 }
 
 /** Write/update heartbeat. Called every poll cycle by the bridge. */

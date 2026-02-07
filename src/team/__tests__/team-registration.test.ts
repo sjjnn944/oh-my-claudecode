@@ -9,7 +9,7 @@ import {
 import type { ConfigProbeResult } from '../types.js';
 
 const TEST_DIR = join(tmpdir(), '__test_team_reg__');
-const TEST_TEAM = '__test_team_reg_team__';
+const TEST_TEAM = 'test-team-reg-team';
 const CONFIG_DIR = join(homedir(), '.claude', 'teams', TEST_TEAM);
 
 beforeEach(() => {

@@ -8,6 +8,7 @@
 import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from 'fs';
 import { join, dirname } from 'path';
 import { homedir } from 'os';
+import { sanitizeName } from './tmux-session.js';
 // --- Atomic write helper ---
 function atomicWriteJson(filePath, data) {
     const dir = dirname(filePath);
@@ -19,7 +20,7 @@ function atomicWriteJson(filePath, data) {
 }
 // --- Config paths ---
 function configPath(teamName) {
-    return join(homedir(), '.claude', 'teams', teamName, 'config.json');
+    return join(homedir(), '.claude', 'teams', sanitizeName(teamName), 'config.json');
 }
 function shadowRegistryPath(workingDirectory) {
     return join(workingDirectory, '.omc', 'state', 'team-mcp-workers.json');

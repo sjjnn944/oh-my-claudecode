@@ -22,6 +22,8 @@ function log(message) {
 function sleep(ms) {
     return new Promise(resolve => setTimeout(resolve, ms));
 }
+/** Maximum stdout/stderr buffer size (10MB) */
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
 /** Build heartbeat data */
 function buildHeartbeat(config, status, currentTaskId, consecutiveErrors) {
     return {
@@ -139,7 +141,7 @@ function spawnCliProcess(provider, prompt, model, cwd, timeoutMs) {
     }
     else {
         cmd = 'gemini';
-        args = ['-p', '', '--yolo'];
+        args = ['--yolo'];
         if (model)
             args.push('--model', model);
     }
@@ -159,8 +161,14 @@ function spawnCliProcess(provider, prompt, model, cwd, timeoutMs) {
                 reject(new Error(`CLI timed out after ${timeoutMs}ms`));
             }
         }, timeoutMs);
-        child.stdout?.on('data', (data) => { stdout += data.toString(); });
-        child.stderr?.on('data', (data) => { stderr += data.toString(); });
+        child.stdout?.on('data', (data) => {
+            if (stdout.length < MAX_BUFFER_SIZE)
+                stdout += data.toString();
+        });
+        child.stderr?.on('data', (data) => {
+            if (stderr.length < MAX_BUFFER_SIZE)
+                stderr += data.toString();
+        });
         child.on('close', (code) => {
             if (!settled) {
                 settled = true;
@@ -201,12 +209,14 @@ async function handleShutdown(config, signal, activeChild) {
     log(`[bridge] Shutdown signal received: ${signal.reason}`);
     // 1. Kill running CLI subprocess
     if (activeChild && !activeChild.killed) {
+        let closed = false;
+        activeChild.on('close', () => { closed = true; });
         activeChild.kill('SIGTERM');
         await Promise.race([
             new Promise(resolve => activeChild.on('close', () => resolve())),
             sleep(5000)
         ]);
-        if (!activeChild.killed) {
+        if (!closed) {
             activeChild.kill('SIGKILL');
         }
     }

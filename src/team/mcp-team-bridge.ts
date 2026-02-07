@@ -31,6 +31,9 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+/** Maximum stdout/stderr buffer size (10MB) */
+const MAX_BUFFER_SIZE = 10 * 1024 * 1024;
+
 /** Build heartbeat data */
 function buildHeartbeat(
   config: BridgeConfig,
@@ -160,7 +163,7 @@ function spawnCliProcess(
     args = ['exec', '-m', model || 'gpt-5.3-codex', '--json', '--full-auto'];
   } else {
     cmd = 'gemini';
-    args = ['-p', '', '--yolo'];
+    args = ['--yolo'];
     if (model) args.push('--model', model);
   }
 
@@ -183,8 +186,12 @@ function spawnCliProcess(
       }
     }, timeoutMs);
 
-    child.stdout?.on('data', (data: Buffer) => { stdout += data.toString(); });
-    child.stderr?.on('data', (data: Buffer) => { stderr += data.toString(); });
+    child.stdout?.on('data', (data: Buffer) => {
+      if (stdout.length < MAX_BUFFER_SIZE) stdout += data.toString();
+    });
+    child.stderr?.on('data', (data: Buffer) => {
+      if (stderr.length < MAX_BUFFER_SIZE) stderr += data.toString();
+    });
 
     child.on('close', (code) => {
       if (!settled) {
@@ -235,12 +242,14 @@ async function handleShutdown(
 
   // 1. Kill running CLI subprocess
   if (activeChild && !activeChild.killed) {
+    let closed = false;
+    activeChild.on('close', () => { closed = true; });
     activeChild.kill('SIGTERM');
     await Promise.race([
       new Promise<void>(resolve => activeChild!.on('close', () => resolve())),
       sleep(5000)
     ]);
-    if (!activeChild.killed) {
+    if (!closed) {
       activeChild.kill('SIGKILL');
     }
   }

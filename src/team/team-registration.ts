@@ -11,6 +11,7 @@ import { readFileSync, writeFileSync, existsSync, mkdirSync, renameSync } from '
 import { join, dirname } from 'path';
 import { homedir } from 'os';
 import type { McpWorkerMember, ConfigProbeResult } from './types.js';
+import { sanitizeName } from './tmux-session.js';
 
 // --- Atomic write helper ---
 
@@ -25,7 +26,7 @@ function atomicWriteJson(filePath: string, data: unknown): void {
 // --- Config paths ---
 
 function configPath(teamName: string): string {
-  return join(homedir(), '.claude', 'teams', teamName, 'config.json');
+  return join(homedir(), '.claude', 'teams', sanitizeName(teamName), 'config.json');
 }
 
 function shadowRegistryPath(workingDirectory: string): string {

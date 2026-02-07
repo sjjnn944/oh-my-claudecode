@@ -7,7 +7,7 @@ import { readTask, updateTask } from '../task-file-ops.js';
 import { checkShutdownSignal, writeShutdownSignal } from '../inbox-outbox.js';
 import { writeHeartbeat, readHeartbeat } from '../heartbeat.js';
 
-const TEST_TEAM = '__test_bridge_int__';
+const TEST_TEAM = 'test-bridge-int';
 const TASKS_DIR = join(homedir(), '.claude', 'tasks', TEST_TEAM);
 const TEAMS_DIR = join(homedir(), '.claude', 'teams', TEST_TEAM);
 const WORK_DIR = join(tmpdir(), '__test_bridge_work__');

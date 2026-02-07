@@ -57,13 +57,13 @@ import {
 // Shared test constants and helpers
 // ============================================================
 
-const EDGE_TEAM_TASKS = '__test_edge_tasks__';
-const EDGE_TEAM_IO = '__test_edge_io__';
+const EDGE_TEAM_TASKS = 'test-edge-tasks';
+const EDGE_TEAM_IO = 'test-edge-io';
 const TASKS_DIR = join(homedir(), '.claude', 'tasks', EDGE_TEAM_TASKS);
 const TEAMS_IO_DIR = join(homedir(), '.claude', 'teams', EDGE_TEAM_IO);
-const HB_DIR = join(tmpdir(), '__test_edge_hb__');
-const REG_DIR = join(tmpdir(), '__test_edge_reg__');
-const REG_TEAM = '__test_edge_reg_team__';
+const HB_DIR = join(tmpdir(), 'test-edge-hb');
+const REG_DIR = join(tmpdir(), 'test-edge-reg');
+const REG_TEAM = 'test-edge-reg-team';
 const CONFIG_DIR = join(homedir(), '.claude', 'teams', REG_TEAM);
 
 function writeTaskHelper(task: TaskFile): void {

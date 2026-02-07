@@ -9,7 +9,7 @@ import {
 } from '../inbox-outbox.js';
 import type { OutboxMessage, InboxMessage } from '../types.js';
 
-const TEST_TEAM = '__test_team_io__';
+const TEST_TEAM = 'test-team-io';
 const TEAMS_DIR = join(homedir(), '.claude', 'teams', TEST_TEAM);
 
 beforeEach(() => {
