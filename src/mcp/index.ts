@@ -77,3 +77,16 @@ export {
   findJobStatusFile,
   getJobManagementToolSchemas
 } from './job-management.js';
+
+// MCP Configuration module
+export {
+  loadMcpConfig,
+  getMcpConfig,
+  clearMcpConfigCache,
+  redirectOutputPath,
+  isExternalPromptAllowed,
+  getOutputPathPolicy,
+  getOutputRedirectDir,
+  DEFAULT_MCP_CONFIG
+} from './mcp-config.js';
+export type { McpConfig, OutputPathPolicy } from './mcp-config.js';

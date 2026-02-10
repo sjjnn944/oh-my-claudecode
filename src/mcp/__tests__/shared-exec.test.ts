@@ -1,7 +1,8 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { mkdirSync, existsSync, rmSync, readFileSync } from 'fs';
 import { join } from 'path';
-import { createStdoutCollector, safeWriteOutputFile, TRUNCATION_MARKER } from '../shared-exec.js';
+import { createStdoutCollector, safeWriteOutputFile, TRUNCATION_MARKER, E_PATH_OUTSIDE_WORKDIR_OUTPUT } from '../shared-exec.js';
+import { clearMcpConfigCache } from '../mcp-config.js';
 
 describe('createStdoutCollector', () => {
   it('should accumulate chunks below the limit', () => {
@@ -84,47 +85,84 @@ describe('safeWriteOutputFile', () => {
   });
 
   afterEach(() => {
+    clearMcpConfigCache();
     if (existsSync(TEST_DIR)) {
       rmSync(TEST_DIR, { recursive: true, force: true });
     }
   });
 
-  it('should write content to a file successfully', async () => {
-    const result = await safeWriteOutputFile('output.txt', 'hello world', TEST_DIR);
-    expect(result).toBeNull(); // null means success
+  it('should write content to a file successfully', () => {
+    const result = safeWriteOutputFile('output.txt', 'hello world', TEST_DIR);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.actualPath).toBe(join(TEST_DIR, 'output.txt'));
+    }
     const content = readFileSync(join(TEST_DIR, 'output.txt'), 'utf-8');
     expect(content).toBe('hello world');
   });
 
-  it('should create intermediate directories', async () => {
-    const result = await safeWriteOutputFile('sub/dir/output.txt', 'nested', TEST_DIR);
-    expect(result).toBeNull();
+  it('should create intermediate directories', () => {
+    const result = safeWriteOutputFile('sub/dir/output.txt', 'nested', TEST_DIR);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.actualPath).toBe(join(TEST_DIR, 'sub', 'dir', 'output.txt'));
+    }
     const content = readFileSync(join(TEST_DIR, 'sub', 'dir', 'output.txt'), 'utf-8');
     expect(content).toBe('nested');
   });
 
-  it('should skip write for paths outside the base directory', async () => {
+  it('should return error for paths outside the base directory in strict mode', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-    const result = await safeWriteOutputFile('../escape.txt', 'bad', TEST_DIR);
-    // Should silently skip (not a hard error), returning null
-    expect(result).toBeNull();
+    // Set strict mode via environment variable
+    const originalPolicy = process.env.OMC_MCP_OUTPUT_PATH_POLICY;
+    process.env.OMC_MCP_OUTPUT_PATH_POLICY = 'strict';
+    clearMcpConfigCache();
+    const result = safeWriteOutputFile('../escape.txt', 'bad', TEST_DIR, '[mcp]');
+    // Restore environment
+    process.env.OMC_MCP_OUTPUT_PATH_POLICY = originalPolicy;
+    // Should return error with E_PATH_OUTSIDE_WORKDIR_OUTPUT
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errorToken).toBe(E_PATH_OUTSIDE_WORKDIR_OUTPUT);
+      expect(result.errorMessage).toContain('E_PATH_OUTSIDE_WORKDIR_OUTPUT');
+      expect(result.errorMessage).toContain('../escape.txt');
+      expect(result.errorMessage).toContain('working_directory');
+      expect(result.errorMessage).toContain("set OMC_MCP_OUTPUT_PATH_POLICY=redirect_output");
+    }
     expect(existsSync(join(TEST_DIR, '..', 'escape.txt'))).toBe(false);
     warnSpy.mockRestore();
   });
 
-  it('should return isError response on write failure', async () => {
+  it('should redirect output for paths outside the base directory in redirect_output mode', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    // Set redirect mode via environment variable
+    const originalPolicy = process.env.OMC_MCP_OUTPUT_PATH_POLICY;
+    process.env.OMC_MCP_OUTPUT_PATH_POLICY = 'redirect_output';
+    clearMcpConfigCache();
+    const result = safeWriteOutputFile('/tmp/escape.txt', 'redirected content', TEST_DIR, '[mcp]');
+    // Restore environment
+    process.env.OMC_MCP_OUTPUT_PATH_POLICY = originalPolicy;
+    // Should redirect to .omc/outputs/
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.actualPath).toBe(join(TEST_DIR, '.omc', 'outputs', 'escape.txt'));
+    }
+    const content = readFileSync(join(TEST_DIR, '.omc', 'outputs', 'escape.txt'), 'utf-8');
+    expect(content).toBe('redirected content');
+    warnSpy.mockRestore();
+  });
+
+  it('should return error response on write failure', () => {
     // Use a path that will fail - directory as file
     mkdirSync(join(TEST_DIR, 'is-a-dir'), { recursive: true });
     // Try to write to a path where a directory exists with the same name
     // This creates a scenario where writeFileSync will fail
-    const result = await safeWriteOutputFile('is-a-dir', 'content', TEST_DIR);
-    // The behavior depends on OS - it might write to the dir or fail
-    // What matters is it either succeeds (null) or returns an error shape
-    if (result !== null) {
-      expect(result.isError).toBe(true);
-      expect(result.content).toHaveLength(1);
-      expect(result.content[0].type).toBe('text');
-      expect(result.content[0].text).toContain('Failed to write output file');
+    const result = safeWriteOutputFile('is-a-dir', 'content', TEST_DIR);
+    // Should return error with E_WRITE_FAILED
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.errorToken).toBe('E_WRITE_FAILED');
+      expect(result.errorMessage).toContain('Failed to write output file');
     }
   });
 });

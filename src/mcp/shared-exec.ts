@@ -7,8 +7,14 @@
 
 import { existsSync, mkdirSync, writeFileSync, realpathSync } from 'fs';
 import { dirname, resolve, relative, isAbsolute, basename, join } from 'path';
+import { getMcpConfig, type OutputPathPolicy } from './mcp-config.js';
 
 export const TRUNCATION_MARKER = '\n\n[OUTPUT TRUNCATED: exceeded 10MB limit]';
+
+/**
+ * Error code for output path outside working directory
+ */
+export const E_PATH_OUTSIDE_WORKDIR_OUTPUT = 'E_PATH_OUTSIDE_WORKDIR_OUTPUT';
 
 /**
  * Creates a streaming stdout collector that accumulates output up to maxBytes.
@@ -47,22 +53,72 @@ export function createStdoutCollector(maxBytes: number): {
 }
 
 /**
+ * Result type for safeWriteOutputFile
+ */
+export type SafeWriteResult =
+  | { success: true; actualPath?: string; errorToken?: never; errorMessage?: never }
+  | { success: false; errorToken: string; errorMessage: string; actualPath?: never };
+
+// Re-export OutputPathPolicy for backward compatibility
+export type { OutputPathPolicy };
+
+/**
  * Safely write content to an output file, ensuring the path stays within
  * the base directory boundary (symlink-safe).
  *
- * @returns An MCP-style error response on failure, or null on success.
+ * @param outputFile - The requested output file path (relative or absolute)
+ * @param content - Content to write
+ * @param baseDirReal - The resolved working directory path
+ * @param logPrefix - Prefix for log messages
+ * @param policy - Policy for handling paths outside working directory ('strict' or 'redirect_output')
+ * @returns A SafeWriteResult indicating success or failure with detailed error info.
  */
-export async function safeWriteOutputFile(
+export function safeWriteOutputFile(
   outputFile: string,
   content: string,
   baseDirReal: string,
   logPrefix: string = '[mcp]',
-): Promise<{ isError: true; content: { type: string; text: string }[] } | null> {
+): SafeWriteResult {
+  const config = getMcpConfig();
+  const policy = config.outputPathPolicy;
   const outputPath = resolve(baseDirReal, outputFile);
   const relOutput = relative(baseDirReal, outputPath);
-  if (relOutput.startsWith('..') || isAbsolute(relOutput)) {
-    console.warn(`${logPrefix} output_file '${outputFile}' resolves outside working directory, skipping write.`);
-    return null; // silently skip, not a hard error
+
+  // Check if path is outside working directory
+  const isOutsideWorkdir = relOutput.startsWith('..') || isAbsolute(relOutput);
+
+  if (isOutsideWorkdir) {
+    if (policy === 'strict') {
+      const errorToken = E_PATH_OUTSIDE_WORKDIR_OUTPUT;
+      const errorMessage = `${errorToken}: output_file '${outputFile}' resolves outside working_directory '${baseDirReal}' and was rejected by policy '${policy}'.
+Requested: ${outputFile}
+Working directory: ${baseDirReal}
+Suggested: use '${join(config.outputRedirectDir, basename(outputFile))}' or set OMC_MCP_OUTPUT_PATH_POLICY=redirect_output`;
+      console.warn(`${logPrefix} ${errorMessage}`);
+      return { success: false, errorToken, errorMessage };
+    }
+
+    // redirect_output policy: redirect to configured directory
+    const redirectDir = isAbsolute(config.outputRedirectDir)
+      ? config.outputRedirectDir
+      : resolve(baseDirReal, config.outputRedirectDir);
+    const safeOutputPath = join(redirectDir, basename(outputFile));
+    const safeRelPath = relative(baseDirReal, safeOutputPath);
+
+    console.warn(`${logPrefix} output_file '${outputFile}' resolves outside working directory, redirecting to '${safeRelPath}' per policy '${policy}'`);
+
+    try {
+      if (!existsSync(redirectDir)) {
+        mkdirSync(redirectDir, { recursive: true });
+      }
+      writeFileSync(safeOutputPath, content, 'utf-8');
+      return { success: true, actualPath: safeOutputPath };
+    } catch (err) {
+      const errorToken = 'E_WRITE_FAILED';
+      const errorMessage = `${errorToken}: Failed to write redirected output file: ${(err as Error).message}`;
+      console.warn(`${logPrefix} ${errorMessage}`);
+      return { success: false, errorToken, errorMessage };
+    }
   }
 
   try {
@@ -71,8 +127,13 @@ export async function safeWriteOutputFile(
     if (!existsSync(outputDir)) {
       const relDir = relative(baseDirReal, outputDir);
       if (relDir.startsWith('..') || isAbsolute(relDir)) {
-        console.warn(`${logPrefix} output_file directory is outside working directory, skipping write.`);
-        return null;
+        const errorToken = E_PATH_OUTSIDE_WORKDIR_OUTPUT;
+        const errorMessage = `${errorToken}: output_file directory '${outputDir}' is outside working_directory '${baseDirReal}'.
+Requested: ${outputFile}
+Working directory: ${baseDirReal}
+Suggested: place the output file within the working directory or set working_directory to a common ancestor`;
+        console.warn(`${logPrefix} ${errorMessage}`);
+        return { success: false, errorToken, errorMessage };
       }
       mkdirSync(outputDir, { recursive: true });
     }
@@ -81,26 +142,36 @@ export async function safeWriteOutputFile(
     try {
       outputDirReal = realpathSync(outputDir);
     } catch {
-      console.warn(`${logPrefix} Failed to resolve output directory, skipping write.`);
-      return null;
+      const errorToken = 'E_PATH_RESOLUTION_FAILED';
+      const errorMessage = `${errorToken}: Failed to resolve output directory '${outputDir}'.
+Requested: ${outputFile}
+Working directory: ${baseDirReal}
+Suggested: ensure the output directory exists and is accessible`;
+      console.warn(`${logPrefix} ${errorMessage}`);
+      return { success: false, errorToken, errorMessage };
     }
 
     if (outputDirReal) {
       const relDirReal = relative(baseDirReal, outputDirReal);
       if (relDirReal.startsWith('..') || isAbsolute(relDirReal)) {
-        console.warn(`${logPrefix} output_file directory resolves outside working directory, skipping write.`);
-        return null;
+        const errorToken = E_PATH_OUTSIDE_WORKDIR_OUTPUT;
+        const errorMessage = `${errorToken}: output_file directory '${outputDir}' resolves outside working_directory '${baseDirReal}'.
+Requested: ${outputFile}
+Working directory: ${baseDirReal}
+Suggested: place the output file within the working directory or set working_directory to a common ancestor`;
+        console.warn(`${logPrefix} ${errorMessage}`);
+        return { success: false, errorToken, errorMessage };
       }
       const safePath = join(outputDirReal, basename(outputPath));
       writeFileSync(safePath, content, 'utf-8');
+      return { success: true, actualPath: safePath };
     }
 
-    return null; // success
+    return { success: true, actualPath: outputPath };
   } catch (err) {
-    console.warn(`${logPrefix} Failed to write output file: ${(err as Error).message}`);
-    return {
-      isError: true,
-      content: [{ type: 'text', text: `Failed to write output file '${outputFile}': ${(err as Error).message}` }],
-    };
+    const errorToken = 'E_WRITE_FAILED';
+    const errorMessage = `${errorToken}: Failed to write output file '${outputFile}': ${(err as Error).message}`;
+    console.warn(`${logPrefix} ${errorMessage}`);
+    return { success: false, errorToken, errorMessage };
   }
 }

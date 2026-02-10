@@ -453,6 +453,9 @@ export async function handleAskGemini(args: {
     };
   }
 
+  // Path policy for error messages
+  const pathPolicy = process.env.OMC_ALLOW_EXTERNAL_WORKDIR === '1' ? 'permissive' : 'strict';
+
   // Security: validate working_directory is within worktree (unless bypass enabled)
   if (process.env.OMC_ALLOW_EXTERNAL_WORKDIR !== '1') {
     const worktreeRoot = getWorktreeRoot(baseDirReal);
@@ -468,7 +471,10 @@ export async function handleAskGemini(args: {
         const relToWorktree = relative(worktreeReal, baseDirReal);
         if (relToWorktree.startsWith('..') || isAbsolute(relToWorktree)) {
           return {
-            content: [{ type: 'text' as const, text: `working_directory '${args.working_directory}' is outside the project worktree (${worktreeRoot}). Set OMC_ALLOW_EXTERNAL_WORKDIR=1 to bypass.` }],
+            content: [{
+              type: 'text' as const,
+              text: `[E_WORKDIR_INVALID] working_directory '${args.working_directory}' is outside the project worktree (${worktreeRoot}).\n\nRemediation: Use a path within the worktree, or set OMC_ALLOW_EXTERNAL_WORKDIR=1 to bypass this security check.\n\nresolved_working_directory: ${baseDirReal}\npath_policy: ${pathPolicy}`
+            }],
             isError: true
           };
         }
@@ -538,7 +544,10 @@ export async function handleAskGemini(args: {
   const relPath = relative(cwdReal, resolvedPath);
   if (relPath === '..' || relPath.startsWith('..' + sep) || isAbsolute(relPath)) {
     return {
-      content: [{ type: 'text' as const, text: `prompt_file '${args.prompt_file}' is outside the working directory.` }],
+      content: [{
+        type: 'text' as const,
+        text: `[E_PATH_OUTSIDE_WORKDIR_PROMPT] prompt_file '${args.prompt_file}' is outside the working directory (${baseDirReal}).\n\nRemediation: Place the prompt file within the working directory or use a relative path that does not traverse outside the project boundary.\n\nresolved_working_directory: ${baseDirReal}\npath_policy: ${pathPolicy}`
+      }],
       isError: true
     };
   }
@@ -556,7 +565,10 @@ export async function handleAskGemini(args: {
   const relReal = relative(cwdReal, resolvedReal);
   if (relReal === '..' || relReal.startsWith('..' + sep) || isAbsolute(relReal)) {
     return {
-      content: [{ type: 'text' as const, text: `prompt_file '${args.prompt_file}' resolves to a path outside the working directory.` }],
+      content: [{
+        type: 'text' as const,
+        text: `[E_PATH_OUTSIDE_WORKDIR_PROMPT] prompt_file '${args.prompt_file}' resolves to a path outside the working directory (${baseDirReal}).\n\nRemediation: Ensure the prompt file (or symlink target) is within the working directory. Symlinks that escape the project boundary are blocked for security.\n\nresolved_working_directory: ${baseDirReal}\npath_policy: ${pathPolicy}`
+      }],
       isError: true
     };
   }
@@ -714,22 +726,29 @@ ${resolvedPrompt}`;
 
       // Always write response to output_file.
       if (args.output_file && resolvedOutputPath) {
-        const writeErr = await safeWriteOutputFile(args.output_file, response, baseDirReal, '[gemini-core]');
-        if (writeErr) {
+        const writeResult = safeWriteOutputFile(args.output_file, response, baseDirReal, '[gemini-core]');
+        if (!writeResult.success) {
           return {
             content: [{
               type: 'text' as const,
-              text: `${fallbackNote}${paramLines}\n\n---\n\n${writeErr.content[0].text}`
+              text: `${fallbackNote}${paramLines}\n\n---\n\n${writeResult.errorMessage}\n\nresolved_working_directory: ${baseDirReal}\npath_policy: ${pathPolicy}`
             }],
             isError: true
           };
         }
       }
 
+      // Build success response with metadata for path policy transparency
+      const responseLines = [
+        `${fallbackNote}${paramLines}`,
+        `**Resolved Working Directory:** ${baseDirReal}`,
+        `**Path Policy:** OMC_ALLOW_EXTERNAL_WORKDIR=${process.env.OMC_ALLOW_EXTERNAL_WORKDIR || '0 (enforced)'}`,
+      ];
+
       return {
         content: [{
           type: 'text' as const,
-          text: `${fallbackNote}${paramLines}`
+          text: responseLines.join('\n')
         }]
       };
     } catch (err) {

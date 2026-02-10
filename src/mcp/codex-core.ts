@@ -588,17 +588,23 @@ export async function handleAskCodex(args: {
   // Derive baseDir from working_directory if provided
   let baseDir = args.working_directory || process.cwd();
   let baseDirReal: string;
+  const pathPolicy = process.env.OMC_ALLOW_EXTERNAL_WORKDIR === '1' ? 'permissive' : 'strict';
   try {
     baseDirReal = realpathSync(baseDir);
   } catch (err) {
+    const errorToken = 'E_WORKDIR_INVALID';
     return {
-      content: [{ type: 'text' as const, text: `working_directory '${args.working_directory}' does not exist or is not accessible: ${(err as Error).message}` }],
+      content: [{ type: 'text' as const, text: `${errorToken}: working_directory '${args.working_directory}' does not exist or is not accessible.
+Error: ${(err as Error).message}
+Resolved working directory: ${baseDir}
+Path policy: ${pathPolicy}
+Suggested: ensure the working directory exists and is accessible` }],
       isError: true
     };
   }
 
   // Security: validate working_directory is within worktree (unless bypass enabled)
-  if (process.env.OMC_ALLOW_EXTERNAL_WORKDIR !== '1') {
+  if (pathPolicy === 'strict') {
     const worktreeRoot = getWorktreeRoot(baseDirReal);
     if (worktreeRoot) {
       let worktreeReal: string;
@@ -611,8 +617,14 @@ export async function handleAskCodex(args: {
       if (worktreeReal) {
         const relToWorktree = relative(worktreeReal, baseDirReal);
         if (relToWorktree.startsWith('..') || isAbsolute(relToWorktree)) {
+          const errorToken = 'E_WORKDIR_INVALID';
           return {
-            content: [{ type: 'text' as const, text: `working_directory '${args.working_directory}' is outside the project worktree (${worktreeRoot}). Set OMC_ALLOW_EXTERNAL_WORKDIR=1 to bypass.` }],
+            content: [{ type: 'text' as const, text: `${errorToken}: working_directory '${args.working_directory}' is outside the project worktree (${worktreeRoot}).
+Requested: ${args.working_directory}
+Resolved working directory: ${baseDirReal}
+Worktree root: ${worktreeRoot}
+Path policy: ${pathPolicy}
+Suggested: use a working_directory within the project worktree, or set OMC_ALLOW_EXTERNAL_WORKDIR=1 to bypass` }],
             isError: true
           };
         }
@@ -681,8 +693,14 @@ export async function handleAskCodex(args: {
   const cwdReal = realpathSync(baseDir);
   const relPath = relative(cwdReal, resolvedPath);
   if (relPath === '..' || relPath.startsWith('..' + sep) || isAbsolute(relPath)) {
+    const errorToken = 'E_PATH_OUTSIDE_WORKDIR_PROMPT';
     return {
-      content: [{ type: 'text' as const, text: `prompt_file '${args.prompt_file}' is outside the working directory.` }],
+      content: [{ type: 'text' as const, text: `${errorToken}: prompt_file '${args.prompt_file}' resolves outside working_directory '${baseDirReal}'.
+Requested: ${args.prompt_file}
+Working directory: ${baseDirReal}
+Resolved working directory: ${baseDirReal}
+Path policy: ${pathPolicy}
+Suggested: place the prompt file within the working directory or set working_directory to a common ancestor` }],
       isError: true
     };
   }
@@ -691,15 +709,27 @@ export async function handleAskCodex(args: {
   try {
     resolvedReal = realpathSync(resolvedPath);
   } catch (err) {
+    const errorToken = 'E_PATH_RESOLUTION_FAILED';
     return {
-      content: [{ type: 'text' as const, text: `Failed to resolve prompt_file '${args.prompt_file}': ${(err as Error).message}` }],
+      content: [{ type: 'text' as const, text: `${errorToken}: Failed to resolve prompt_file '${args.prompt_file}'.
+Error: ${(err as Error).message}
+Resolved working directory: ${baseDirReal}
+Path policy: ${pathPolicy}
+Suggested: ensure the prompt file exists and is accessible` }],
       isError: true
     };
   }
   const relReal = relative(cwdReal, resolvedReal);
   if (relReal === '..' || relReal.startsWith('..' + sep) || isAbsolute(relReal)) {
+    const errorToken = 'E_PATH_OUTSIDE_WORKDIR_PROMPT';
     return {
-      content: [{ type: 'text' as const, text: `prompt_file '${args.prompt_file}' resolves to a path outside the working directory.` }],
+      content: [{ type: 'text' as const, text: `${errorToken}: prompt_file '${args.prompt_file}' resolves to a path outside working_directory '${baseDirReal}'.
+Requested: ${args.prompt_file}
+Resolved path: ${resolvedReal}
+Working directory: ${baseDirReal}
+Resolved working directory: ${baseDirReal}
+Path policy: ${pathPolicy}
+Suggested: place the prompt file within the working directory or set working_directory to a common ancestor` }],
       isError: true
     };
   }
@@ -817,6 +847,8 @@ ${resolvedPrompt}`;
     context_files?.length ? `**Files:** ${context_files.join(', ')}` : null,
     promptResult ? `**Prompt File:** ${promptResult.filePath}` : null,
     expectedResponsePath ? `**Response File:** ${expectedResponsePath}` : null,
+    `**Resolved Working Directory:** ${baseDirReal}`,
+    `**Path Policy:** ${pathPolicy}`,
   ].filter(Boolean).join('\n');
 
   try {
@@ -842,12 +874,12 @@ ${resolvedPrompt}`;
     // last agent message, which may be a brief acknowledgment. The JSONL-parsed
     // stdout contains ALL agent messages and is always more comprehensive.
     if (args.output_file) {
-      const writeErr = await safeWriteOutputFile(args.output_file, response, baseDirReal, '[codex-core]');
-      if (writeErr) {
+      const writeResult = safeWriteOutputFile(args.output_file, response, baseDirReal, '[codex-core]');
+      if (!writeResult.success) {
         return {
           content: [{
             type: 'text' as const,
-            text: `${paramLines}\n\n---\n\n${writeErr.content[0].text}`
+            text: `${paramLines}\n\n---\n\n${writeResult.errorMessage}\n\nresolved_working_directory: ${baseDirReal}\npath_policy: ${pathPolicy}`
           }],
           isError: true
         };
