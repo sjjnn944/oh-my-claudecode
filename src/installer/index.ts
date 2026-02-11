@@ -185,14 +185,28 @@ export function isProjectScopedPlugin(): boolean {
 }
 
 /**
- * Get the package root directory
- * From dist/installer/index.js, go up to package root
+ * Get the package root directory.
+ * Works for both ESM (dist/installer/) and CJS bundles (bridge/).
+ * When esbuild bundles to CJS, import.meta is replaced with {} so we
+ * fall back to __dirname which is natively available in CJS.
  */
 function getPackageDir(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  // From dist/installer/index.js, go up to package root
-  return join(__dirname, '..', '..');
+  try {
+    if (import.meta?.url) {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      // From dist/installer/index.js, go up to package root
+      return join(__dirname, '..', '..');
+    }
+  } catch {
+    // import.meta.url unavailable — fall through to CJS path
+  }
+  // CJS bundle path: from bridge/ go up 1 level to package root
+  // eslint-disable-next-line no-undef
+  if (typeof __dirname !== 'undefined') {
+    return join(__dirname, '..');
+  }
+  return process.cwd();
 }
 
 /**

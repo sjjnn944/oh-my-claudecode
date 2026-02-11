@@ -11,13 +11,31 @@ import { fileURLToPath } from 'url';
 import { loadAgentPrompt } from '../agents/utils.js';
 
 /**
- * Get the package root directory
+ * Get the package root directory.
+ * Handles both ESM (import.meta.url) and CJS bundle (__dirname) contexts.
+ * When esbuild bundles to CJS, import.meta is replaced with {} so we
+ * fall back to __dirname which is natively available in CJS.
  */
 function getPackageDir(): string {
-  const __filename = fileURLToPath(import.meta.url);
-  const __dirname = dirname(__filename);
-  // From src/mcp/ go up to package root
-  return join(__dirname, '..', '..');
+  try {
+    // ESM path (works in dev via ts/dist)
+    if (import.meta?.url) {
+      const __filename = fileURLToPath(import.meta.url);
+      const __dirname = dirname(__filename);
+      // From src/mcp/ or dist/mcp/ go up to package root
+      return join(__dirname, '..', '..');
+    }
+  } catch {
+    // import.meta.url unavailable — fall through to CJS path
+  }
+  // CJS bundle path: __dirname is available natively in CJS.
+  // From bridge/ go up 1 level to package root.
+  // eslint-disable-next-line no-undef
+  if (typeof __dirname !== 'undefined') {
+    return join(__dirname, '..');
+  }
+  // Last resort: use process.cwd()
+  return process.cwd();
 }
 
 /**
